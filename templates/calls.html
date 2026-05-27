@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calls - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div>
+        <p class="eyebrow">Call Records</p>
+        <h1>Search and prioritize patient conversations.</h1>
+      </div>
+      <div class="hero-actions">
+        <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
+        <a class="secondary-button link-button" href="/analytics">Analytics</a>
+      </div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/calls" class="filter-grid">
+          <label><span>Search</span><input name="q" value="{{ filters.q }}" placeholder="Phone, patient, summary"></label>
+          <label>
+            <span>Intent</span>
+            <select name="intent">
+              <option value="">All</option>
+              {% for item in call_intents %}
+                <option value="{{ item }}" {% if filters.intent == item %}selected{% endif %}>{{ item.replace("_", " ").title() }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Lead score</span>
+            <select name="lead_score">
+              <option value="">All</option>
+              {% for item in lead_scores %}
+                <option value="{{ item }}" {% if filters.lead_score == item %}selected{% endif %}>{{ item.title() }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="checkbox-row"><input type="checkbox" name="urgent_only" value="true" {% if filters.urgent_only %}checked{% endif %}><span>Urgent only</span></label>
+          <button type="submit" class="primary-button">Apply Filters</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="content-grid single-column">
+      {% for item in call_records %}
+        <article class="panel">
+          <div class="panel-body">
+            <div class="record-list-item">
+              <div>
+                <strong>{{ item.intent.replace("_", " ").title() }}</strong>
+                <p class="message-paragraph">{{ item.summary }}</p>
+                <span class="muted-line">{{ item.patient_name or item.caller_number }}</span>
+                {% if item.appointment_request %}<span class="muted-line">Linked appointment: {{ item.appointment_request.patient_name }}</span>{% endif %}
+              </div>
+              <div class="record-meta">
+                <span>{{ item.created_at[:10] }}</span>
+                {% if item.urgent %}<span class="pill urgent">Urgent</span>{% endif %}
+              </div>
+            </div>
+            <form class="call-score-form inline-form" data-call-id="{{ item.id }}">
+              <label>
+                <span>Lead score</span>
+                <select name="lead_score">
+                  {% for score in lead_scores %}
+                    <option value="{{ score }}" {% if item.lead_score == score %}selected{% endif %}>{{ score.title() }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit" class="primary-button">Save Score</button>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No calls match these filters.</p></div></article>
+      {% endfor %}
+    </section>
+  <script src="/static/app.js"></script>
+</body>
+</html>

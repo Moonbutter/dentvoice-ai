@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docs - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div>
+        <p class="eyebrow">Product Docs</p>
+        <h1>How DentVoice AI works under the hood.</h1>
+      </div>
+      <div class="hero-actions">
+        <a class="secondary-button link-button" href="/">Landing</a>
+        <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>Main Routes</h2><p>Core user-facing pages</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>/</strong><span>Public landing page</span></li>
+            <li><strong>/dashboard</strong><span>Clinic admin overview</span></li>
+            <li><strong>/appointments</strong><span>Appointment management with filters, notes, and delete/edit</span></li>
+            <li><strong>/calls</strong><span>Call records with lead scoring</span></li>
+            <li><strong>/analytics</strong><span>Free operational analytics</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Useful APIs</h2><p>Examples of the product’s backend capabilities</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>GET /api/dashboard</strong><span>JSON data powering the dashboard</span></li>
+            <li><strong>POST /api/admin/appointments</strong><span>Create a booking from the UI</span></li>
+            <li><strong>POST /api/appointments/{id}/update</strong><span>Edit appointment details and notes</span></li>
+            <li><strong>POST /api/calls/{id}/lead-score</strong><span>Score a patient lead as hot, warm, or cold</span></li>
+            <li><strong>GET /api/export/appointments.csv</strong><span>Export bookings to CSV</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Current Free Feature Set</h2><p>All of these work without paid AI usage</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Persistent storage</strong><span>SQLite stores appointments, slots, calls, settings, and notes.</span></li>
+            <li><strong>Search and filters</strong><span>Dedicated operational pages help staff review activity faster.</span></li>
+            <li><strong>Edit and delete workflows</strong><span>Appointments can be updated, annotated, or removed.</span></li>
+            <li><strong>Lead prioritization</strong><span>Calls can be categorized with free lead scoring logic.</span></li>
+            <li><strong>Analytics and exports</strong><span>Product usage can be tracked without external analytics tools.</span></li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

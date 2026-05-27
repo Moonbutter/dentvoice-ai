@@ -110,12 +110,39 @@ document.querySelectorAll(".slot-delete").forEach((button) => {
   });
 });
 
-document.querySelectorAll(".status-form").forEach((form) => {
-  form.addEventListener("change", async () => {
+document.querySelectorAll(".appointment-edit-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
     try {
-      const data = new FormData();
-      data.append("status", form.status.value);
-      await postForm(`/api/appointments/${form.dataset.appointmentId}/status`, data);
+      const formData = new FormData(form);
+      await postForm(`/api/appointments/${form.dataset.appointmentId}/update`, formData);
+      refreshPage();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+});
+
+document.querySelectorAll(".appointment-delete").forEach((button) => {
+  button.addEventListener("click", async () => {
+    if (!window.confirm("Delete this appointment?")) {
+      return;
+    }
+    try {
+      await postForm(`/api/appointments/${button.dataset.appointmentId}/delete`, new FormData());
+      refreshPage();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+});
+
+document.querySelectorAll(".call-score-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/calls/${form.dataset.callId}/lead-score`, formData);
       refreshPage();
     } catch (error) {
       alert(error.message);

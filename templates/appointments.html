@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointments - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div>
+        <p class="eyebrow">Appointments</p>
+        <h1>Search, filter, edit, and manage bookings.</h1>
+      </div>
+      <div class="hero-actions">
+        <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
+        <a class="secondary-button link-button" href="/analytics">Analytics</a>
+      </div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/appointments" class="filter-grid">
+          <label><span>Search</span><input name="q" value="{{ filters.q }}" placeholder="Name, phone, reason"></label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="">All</option>
+              {% for status in statuses %}
+                <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status.replace("_", " ").title() }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Source</span>
+            <select name="source">
+              <option value="">All</option>
+              <option value="admin" {% if filters.source == "admin" %}selected{% endif %}>Admin</option>
+              <option value="voice_call" {% if filters.source == "voice_call" %}selected{% endif %}>Voice Call</option>
+              <option value="simulated_call" {% if filters.source == "simulated_call" %}selected{% endif %}>Simulated Call</option>
+              <option value="api" {% if filters.source == "api" %}selected{% endif %}>API</option>
+            </select>
+          </label>
+          <label><span>Date</span><input type="date" name="preferred_date" value="{{ filters.preferred_date }}"></label>
+          <button type="submit" class="primary-button">Apply Filters</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="content-grid single-column">
+      {% for item in appointments %}
+        <article class="panel">
+          <div class="panel-body">
+            <form class="appointment-edit-form stack-form" data-appointment-id="{{ item.id }}">
+              <div class="split-grid">
+                <label><span>Patient name</span><input name="patient_name" value="{{ item.patient_name }}" required></label>
+                <label><span>Phone number</span><input name="phone_number" value="{{ item.phone_number }}" required></label>
+              </div>
+              <div class="split-grid">
+                <label><span>Date</span><input type="date" name="preferred_date" value="{{ item.preferred_date }}" required></label>
+                <label><span>Time</span><input name="preferred_time" value="{{ item.preferred_time }}" required></label>
+              </div>
+              <label><span>Reason for visit</span><input name="reason_for_visit" value="{{ item.reason_for_visit }}" required></label>
+              <label><span>Notes</span><textarea name="notes" rows="3">{{ item.notes }}</textarea></label>
+              <div class="split-grid">
+                <label>
+                  <span>Status</span>
+                  <select name="status">
+                    {% for status in statuses %}
+                      <option value="{{ status }}" {% if item.status == status %}selected{% endif %}>{{ status.replace("_", " ").title() }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <div class="form-actions-row">
+                  <button type="submit" class="primary-button">Save Changes</button>
+                  <button type="button" class="danger-button appointment-delete" data-appointment-id="{{ item.id }}">Delete</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No appointments match these filters.</p></div></article>
+      {% endfor %}
+    </section>
+  <script src="/static/app.js"></script>
+</body>
+</html>

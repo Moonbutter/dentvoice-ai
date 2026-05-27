@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">AI Receptionist for Dental Clinics</p>
         <h1>{{ settings.clinic_name }}</h1>
-        <p class="hero-copy">A voice-first front desk for Indian dental clinics that answers calls, captures appointments, detects emergencies, and follows up on WhatsApp. The dashboard now stores data persistently, supports admin bookings, slot management, and free CSV exports.</p>
+        <p class="hero-copy">Your live admin workspace for appointments, calls, lead scoring, slot management, clinic settings, exports, and follow-up notes.</p>
         <div class="hero-meta">
           <span>{{ settings.clinic_timings }}</span>
           <span>{{ settings.clinic_address }}</span>
@@ -23,10 +23,10 @@
       </div>
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/">View Landing Page</a>
-        <button id="seed-demo" class="primary-button">Load Demo Data</button>
-        <button id="simulate-call" class="secondary-button">Simulate New Call</button>
-        <a class="secondary-button link-button" href="/api/export/appointments.csv">Export Appointments CSV</a>
-        <a class="secondary-button link-button" href="/api/export/calls.csv">Export Calls CSV</a>
+        <a class="secondary-button link-button" href="/appointments">Appointments</a>
+        <a class="secondary-button link-button" href="/calls">Calls</a>
+        <a class="secondary-button link-button" href="/analytics">Analytics</a>
+        <a class="secondary-button link-button" href="/docs">Docs</a>
       </div>
     </section>
 
@@ -57,28 +57,14 @@
         </div>
         <div class="panel-body">
           <form id="appointment-form" class="stack-form">
-            <label>
-              <span>Patient name</span>
-              <input name="patient_name" required>
-            </label>
-            <label>
-              <span>Phone number</span>
-              <input name="phone_number" required>
-            </label>
+            <label><span>Patient name</span><input name="patient_name" required></label>
+            <label><span>Phone number</span><input name="phone_number" required></label>
             <div class="split-grid">
-              <label>
-                <span>Date</span>
-                <input type="date" name="preferred_date" required>
-              </label>
-              <label>
-                <span>Time</span>
-                <input name="preferred_time" placeholder="5:30 PM" required>
-              </label>
+              <label><span>Date</span><input type="date" name="preferred_date" required></label>
+              <label><span>Time</span><input name="preferred_time" placeholder="5:30 PM" required></label>
             </div>
-            <label>
-              <span>Reason for visit</span>
-              <input name="reason_for_visit" required>
-            </label>
+            <label><span>Reason for visit</span><input name="reason_for_visit" required></label>
+            <label><span>Notes</span><textarea name="notes" rows="3" placeholder="Optional follow-up note"></textarea></label>
             <label>
               <span>Status</span>
               <select name="status">
@@ -98,19 +84,10 @@
           <p>Edit the business details used across the dashboard and call flow</p>
         </div>
         <div class="panel-body">
-          <form id="settings-form" class="stack-form json-form">
-            <label>
-              <span>Clinic name</span>
-              <input name="clinic_name" value="{{ settings.clinic_name }}" required>
-            </label>
-            <label>
-              <span>Clinic timings</span>
-              <input name="clinic_timings" value="{{ settings.clinic_timings }}" required>
-            </label>
-            <label>
-              <span>Clinic address</span>
-              <input name="clinic_address" value="{{ settings.clinic_address }}" required>
-            </label>
+          <form id="settings-form" class="stack-form">
+            <label><span>Clinic name</span><input name="clinic_name" value="{{ settings.clinic_name }}" required></label>
+            <label><span>Clinic timings</span><input name="clinic_timings" value="{{ settings.clinic_timings }}" required></label>
+            <label><span>Clinic address</span><input name="clinic_address" value="{{ settings.clinic_address }}" required></label>
             <button type="submit" class="primary-button">Update Settings</button>
           </form>
         </div>
@@ -118,8 +95,40 @@
 
       <article class="panel">
         <div class="panel-header">
-          <h2>Appointment Requests</h2>
-          <p>Recent bookings captured by the AI receptionist</p>
+          <h2>Analytics Snapshot</h2>
+          <p>Quick business health from the last saved activity</p>
+        </div>
+        <div class="panel-body">
+          <div class="mini-metrics">
+            {% for key, value in analytics.appointments_by_status.items() %}
+              <div class="mini-metric">
+                <strong>{{ value }}</strong>
+                <span>{{ key.replace("_", " ").title() }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <a class="secondary-button link-button top-gap-inline" href="/analytics">Open Full Analytics</a>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Free Feature Pack</h2>
+          <p>The product now includes multiple no-cost operational upgrades</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Persistent SQLite storage</strong><span>Appointments, calls, slots, and settings survive restarts.</span></li>
+            <li><strong>Lead scoring</strong><span>Calls can be marked hot, warm, or cold based on urgency and booking likelihood.</span></li>
+            <li><strong>Search and filtering</strong><span>Dedicated pages let you review appointments and call records faster.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header">
+          <h2>Recent Appointments</h2>
+          <p>Use the full page for filtering, notes, edit, and delete</p>
         </div>
         <div class="panel-body">
           {% if appointments %}
@@ -130,17 +139,12 @@
                     <strong>{{ item.patient_name }}</strong>
                     <span>{{ item.reason_for_visit }}</span>
                     <span class="muted-line">{{ item.phone_number }}</span>
+                    {% if item.notes %}<span class="muted-line">Note: {{ item.notes }}</span>{% endif %}
                   </div>
                   <div class="record-meta">
                     <span>{{ item.preferred_date }}</span>
                     <span>{{ item.preferred_time }}</span>
-                    <form class="status-form" data-appointment-id="{{ item.id }}">
-                      <select name="status" class="status-select">
-                        {% for status in statuses %}
-                          <option value="{{ status }}" {% if item.status == status %}selected{% endif %}>{{ status.replace("_", " ").title() }}</option>
-                        {% endfor %}
-                      </select>
-                    </form>
+                    <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
                   </div>
                 </li>
               {% endfor %}
@@ -153,8 +157,8 @@
 
       <article class="panel">
         <div class="panel-header">
-          <h2>Call Summaries</h2>
-          <p>AI-generated summaries and detected intent</p>
+          <h2>Recent Calls</h2>
+          <p>Latest voice activity with lead prioritization</p>
         </div>
         <div class="panel-body">
           {% if call_records %}
@@ -164,6 +168,7 @@
                   <div>
                     <strong>{{ item.intent.replace("_", " ").title() }}</strong>
                     <span>{{ item.summary }}</span>
+                    <span class="muted-line">Lead score: {{ item.lead_score.title() }}</span>
                   </div>
                   <div class="record-meta">
                     <span>{{ item.patient_name or item.caller_number }}</span>
@@ -180,58 +185,14 @@
 
       <article class="panel">
         <div class="panel-header">
-          <h2>WhatsApp Follow-Ups</h2>
-          <p>Messages sent after calls and booking requests</p>
-        </div>
-        <div class="panel-body">
-          {% if messages %}
-            <ul class="message-list">
-              {% for item in messages %}
-                <li>
-                  <strong>{{ item.phone_number }}</strong>
-                  <p>{{ item.message }}</p>
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="empty-state">No messages sent yet.</p>
-          {% endif %}
-        </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-header">
-          <h2>FAQ Knowledge</h2>
-          <p>Common repetitive front-desk questions</p>
-        </div>
-        <div class="panel-body">
-          <ul class="faq-list">
-            {% for item in faqs %}
-              <li>
-                <strong>{{ item.question }}</strong>
-                <span>{{ item.answer }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-header">
           <h2>Slot Management</h2>
           <p>Add or remove live booking slots offered during calls</p>
         </div>
         <div class="panel-body">
-          <form id="slot-form" class="stack-form json-form compact-form">
+          <form id="slot-form" class="stack-form compact-form">
             <div class="split-grid">
-              <label>
-                <span>Date</span>
-                <input type="date" name="date" required>
-              </label>
-              <label>
-                <span>Time</span>
-                <input name="time" placeholder="11:00 AM" required>
-              </label>
+              <label><span>Date</span><input type="date" name="date" required></label>
+              <label><span>Time</span><input name="time" placeholder="11:00 AM" required></label>
             </div>
             <button type="submit" class="primary-button">Add Slot</button>
           </form>

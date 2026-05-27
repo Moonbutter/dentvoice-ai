@@ -3,12 +3,13 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -29,6 +30,7 @@ class AppointmentRequest(BaseModel):
     reason_for_visit: str
     status: Literal["new", "confirmed", "completed", "cancelled", "needs_follow_up"] = "confirmed"
     source: Literal["api", "simulated_call", "voice_call", "admin"] = "api"
+    notes: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
@@ -47,6 +49,7 @@ class CallRecord(BaseModel):
     ] = "general"
     summary: str
     urgent: bool = False
+    lead_score: Literal["hot", "warm", "cold"] = "warm"
     appointment_request: AppointmentRequest | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -98,6 +101,10 @@ FAQS = [
     FAQAnswer(question="Is a consultation available today?", answer="Same-day consultation depends on doctor availability, and we can help request a slot."),
 ]
 
+APPOINTMENT_STATUSES = ["new", "confirmed", "completed", "cancelled", "needs_follow_up"]
+CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "faq", "emergency", "general"]
+LEAD_SCORES = ["hot", "warm", "cold"]
+
 call_sessions: dict[str, CallSession] = {}
 
 app = FastAPI(title="DentVoice AI MVP")
@@ -109,6 +116,11 @@ def get_db() -> sqlite3.Connection:
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def column_exists(db: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    rows = db.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(row["name"] == column_name for row in rows)
 
 
 def next_business_day(start: date, *, days_ahead: int = 0) -> date:
@@ -179,6 +191,12 @@ def init_db() -> None:
             );
             """
         )
+
+        if not column_exists(db, "appointments", "notes"):
+            db.execute("ALTER TABLE appointments ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "call_records", "lead_score"):
+            db.execute("ALTER TABLE call_records ADD COLUMN lead_score TEXT NOT NULL DEFAULT 'warm'")
+
         existing_settings = db.execute("SELECT COUNT(*) AS count FROM clinic_settings").fetchone()["count"]
         if existing_settings == 0:
             db.execute(
@@ -188,10 +206,12 @@ def init_db() -> None:
                 """,
                 ("Smile Dental Clinic", "Monday to Saturday, 9 AM to 8 PM", "Near the main market with parking available"),
             )
+
         existing_slots = db.execute("SELECT COUNT(*) AS count FROM slots").fetchone()["count"]
         if existing_slots == 0:
             for slot in default_slots():
                 db.execute("INSERT INTO slots (slot_date, slot_time) VALUES (?, ?)", (slot["date"], slot["time"]))
+
         db.commit()
 
 
@@ -238,44 +258,90 @@ def fetch_slots() -> list[dict[str, str]]:
         ]
 
 
-def fetch_appointments(limit: int = 20) -> list[AppointmentRequest]:
+def fetch_appointments(
+    *,
+    limit: int = 20,
+    search: str = "",
+    status: str = "",
+    source: str = "",
+    preferred_date: str = "",
+) -> list[AppointmentRequest]:
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if search:
+        conditions.append("(patient_name LIKE ? OR phone_number LIKE ? OR reason_for_visit LIKE ?)")
+        pattern = f"%{search}%"
+        params.extend([pattern, pattern, pattern])
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    if source:
+        conditions.append("source = ?")
+        params.append(source)
+    if preferred_date:
+        conditions.append("preferred_date = ?")
+        params.append(preferred_date)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    query = f"""
+        SELECT id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at
+        FROM appointments
+        {where_clause}
+        ORDER BY datetime(created_at) DESC
+        LIMIT ?
+    """
+    params.append(limit)
+
     with get_db() as db:
-        rows = db.execute(
-            """
-            SELECT id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, created_at
-            FROM appointments
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        rows = db.execute(query, params).fetchall()
         return [AppointmentRequest(**dict(row)) for row in rows]
 
 
-def fetch_call_records(limit: int = 20) -> list[CallRecord]:
-    appointments = {item.id: item for item in fetch_appointments(limit=100)}
+def fetch_call_records(
+    *,
+    limit: int = 20,
+    search: str = "",
+    intent: str = "",
+    urgent_only: bool = False,
+    lead_score: str = "",
+) -> list[CallRecord]:
+    appointments = {item.id: item for item in fetch_appointments(limit=500)}
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if search:
+        conditions.append("(caller_number LIKE ? OR COALESCE(patient_name, '') LIKE ? OR summary LIKE ?)")
+        pattern = f"%{search}%"
+        params.extend([pattern, pattern, pattern])
+    if intent:
+        conditions.append("intent = ?")
+        params.append(intent)
+    if urgent_only:
+        conditions.append("urgent = 1")
+    if lead_score:
+        conditions.append("lead_score = ?")
+        params.append(lead_score)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    query = f"""
+        SELECT id, caller_number, patient_name, intent, summary, urgent, lead_score, appointment_id, created_at
+        FROM call_records
+        {where_clause}
+        ORDER BY datetime(created_at) DESC
+        LIMIT ?
+    """
+    params.append(limit)
+
     with get_db() as db:
-        rows = db.execute(
-            """
-            SELECT id, caller_number, patient_name, intent, summary, urgent, appointment_id, created_at
-            FROM call_records
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        rows = db.execute(query, params).fetchall()
 
     records: list[CallRecord] = []
     for row in rows:
         data = dict(row)
         appointment_id = data.pop("appointment_id")
         data["urgent"] = bool(data["urgent"])
-        records.append(
-            CallRecord(
-                **data,
-                appointment_request=appointments.get(appointment_id),
-            )
-        )
+        records.append(CallRecord(**data, appointment_request=appointments.get(appointment_id)))
     return records
 
 
@@ -291,6 +357,44 @@ def fetch_messages(limit: int = 20) -> list[WhatsAppMessage]:
             (limit,),
         ).fetchall()
         return [WhatsAppMessage(**dict(row)) for row in rows]
+
+
+def fetch_analytics() -> dict[str, object]:
+    appointments = fetch_appointments(limit=1000)
+    calls = fetch_call_records(limit=1000)
+    messages = fetch_messages(limit=1000)
+
+    appointments_by_status = Counter(item.status for item in appointments)
+    appointments_by_source = Counter(item.source for item in appointments)
+    calls_by_intent = Counter(item.intent for item in calls)
+    calls_by_lead_score = Counter(item.lead_score for item in calls)
+
+    recent_days: list[dict[str, object]] = []
+    today = datetime.now(UTC).date()
+    for offset in range(6, -1, -1):
+        current_day = today - timedelta(days=offset)
+        iso_day = current_day.isoformat()
+        recent_days.append(
+            {
+                "date": iso_day,
+                "appointments": sum(1 for item in appointments if item.created_at[:10] == iso_day),
+                "calls": sum(1 for item in calls if item.created_at[:10] == iso_day),
+            }
+        )
+
+    return {
+        "totals": {
+            "appointments": len(appointments),
+            "calls": len(calls),
+            "messages": len(messages),
+            "emergencies": sum(1 for item in calls if item.urgent),
+        },
+        "appointments_by_status": dict(appointments_by_status),
+        "appointments_by_source": dict(appointments_by_source),
+        "calls_by_intent": dict(calls_by_intent),
+        "calls_by_lead_score": dict(calls_by_lead_score),
+        "recent_days": recent_days,
+    }
 
 
 def escape_xml(value: str) -> str:
@@ -321,6 +425,14 @@ def redirect(url: str) -> str:
 def twiml(*parts: str) -> str:
     body = "".join(parts)
     return f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>'
+
+
+def infer_lead_score(intent: str, urgent: bool) -> str:
+    if urgent or intent == "emergency":
+        return "hot"
+    if intent in {"appointment_booking", "reschedule"}:
+        return "warm"
+    return "cold"
 
 
 def lookup_slot(option: str | None, speech_result: str | None = None) -> dict[str, str] | None:
@@ -403,6 +515,7 @@ def create_appointment_record(
     reason_for_visit: str,
     source: Literal["api", "simulated_call", "voice_call", "admin"],
     status: Literal["new", "confirmed", "completed", "cancelled", "needs_follow_up"] = "confirmed",
+    notes: str = "",
 ) -> AppointmentRequest:
     appointment = AppointmentRequest(
         patient_name=patient_name,
@@ -412,13 +525,14 @@ def create_appointment_record(
         reason_for_visit=reason_for_visit,
         source=source,
         status=status,
+        notes=notes,
     )
     with get_db() as db:
         db.execute(
             """
             INSERT INTO appointments (
-                id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 appointment.id,
@@ -429,15 +543,12 @@ def create_appointment_record(
                 appointment.reason_for_visit,
                 appointment.status,
                 appointment.source,
+                appointment.notes,
                 appointment.created_at,
             ),
         )
         db.commit()
-    send_whatsapp_confirmation(
-        phone_number,
-        patient_name,
-        f"appointment booked for {preferred_date} at {preferred_time}",
-    )
+    send_whatsapp_confirmation(phone_number, patient_name, f"appointment booked for {preferred_date} at {preferred_time}")
     return appointment
 
 
@@ -456,14 +567,15 @@ def create_call_record(
         intent=intent,
         summary=summary,
         urgent=urgent,
+        lead_score=infer_lead_score(intent, urgent),
         appointment_request=appointment_request,
     )
     with get_db() as db:
         db.execute(
             """
             INSERT INTO call_records (
-                id, caller_number, patient_name, intent, summary, urgent, appointment_id, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                id, caller_number, patient_name, intent, summary, urgent, lead_score, appointment_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record.id,
@@ -472,6 +584,7 @@ def create_call_record(
                 record.intent,
                 record.summary,
                 int(record.urgent),
+                record.lead_score,
                 appointment_request.id if appointment_request else None,
                 record.created_at,
             ),
@@ -500,21 +613,31 @@ def build_dashboard_context() -> dict[str, object]:
     messages = fetch_messages(limit=10)
     slots = fetch_slots()
     settings = fetch_clinic_settings()
+    analytics = fetch_analytics()
     return {
-        "stats": {
-            "appointments": len(fetch_appointments(limit=500)),
-            "calls": len(fetch_call_records(limit=500)),
-            "emergencies": sum(1 for call in fetch_call_records(limit=500) if call.urgent),
-            "messages": len(fetch_messages(limit=500)),
-        },
+        "stats": analytics["totals"],
         "appointments": appointments,
         "call_records": call_records,
         "messages": messages,
         "faqs": FAQS,
         "slots": slots,
         "settings": settings,
-        "statuses": ["new", "confirmed", "completed", "cancelled", "needs_follow_up"],
+        "analytics": analytics,
+        "statuses": APPOINTMENT_STATUSES,
+        "lead_scores": LEAD_SCORES,
     }
+
+
+def csv_response(filename: str, fieldnames: list[str], rows: list[dict[str, object]]) -> StreamingResponse:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 init_db()
@@ -530,6 +653,59 @@ async def landing_page(request: Request) -> HTMLResponse:
 async def dashboard(request: Request) -> HTMLResponse:
     context = build_dashboard_context()
     return templates.TemplateResponse(request, "dashboard.html", context)
+
+
+@app.get("/appointments", response_class=HTMLResponse)
+async def appointments_page(
+    request: Request,
+    q: str = Query(default=""),
+    status: str = Query(default=""),
+    source: str = Query(default=""),
+    preferred_date: str = Query(default=""),
+) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Appointments",
+            "appointments": fetch_appointments(limit=200, search=q, status=status, source=source, preferred_date=preferred_date),
+            "filters": {"q": q, "status": status, "source": source, "preferred_date": preferred_date},
+        }
+    )
+    return templates.TemplateResponse(request, "appointments.html", context)
+
+
+@app.get("/calls", response_class=HTMLResponse)
+async def calls_page(
+    request: Request,
+    q: str = Query(default=""),
+    intent: str = Query(default=""),
+    urgent_only: bool = Query(default=False),
+    lead_score: str = Query(default=""),
+) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Calls",
+            "call_records": fetch_call_records(limit=200, search=q, intent=intent, urgent_only=urgent_only, lead_score=lead_score),
+            "filters": {"q": q, "intent": intent, "urgent_only": urgent_only, "lead_score": lead_score},
+            "call_intents": CALL_INTENTS,
+        }
+    )
+    return templates.TemplateResponse(request, "calls.html", context)
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update({"page_title": "Analytics"})
+    return templates.TemplateResponse(request, "analytics.html", context)
+
+
+@app.get("/docs", response_class=HTMLResponse)
+async def docs_page(request: Request) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update({"page_title": "Docs"})
+    return templates.TemplateResponse(request, "docs.html", context)
 
 
 @app.get("/health")
@@ -548,6 +724,7 @@ async def dashboard_data() -> JSONResponse:
             "messages": [item.model_dump() for item in context["messages"]],
             "slots": context["slots"],
             "settings": context["settings"],
+            "analytics": context["analytics"],
         }
     )
 
@@ -587,7 +764,6 @@ async def simulate_call(payload: SimulatedCallPayload) -> JSONResponse:
         summary=create_summary(intent, payload),
         appointment_request=appointment_request,
     )
-
     return JSONResponse({"message": "Call processed successfully", "intent": intent, "call_record": record.model_dump()})
 
 
@@ -601,6 +777,7 @@ async def create_appointment(appointment: AppointmentRequest) -> JSONResponse:
         reason_for_visit=appointment.reason_for_visit,
         source="api",
         status=appointment.status,
+        notes=appointment.notes,
     )
     return JSONResponse({"message": "Appointment captured", "appointment": stored.model_dump()})
 
@@ -613,6 +790,7 @@ async def create_admin_appointment(
     preferred_time: str = Form(...),
     reason_for_visit: str = Form(...),
     status: str = Form(default="confirmed"),
+    notes: str = Form(default=""),
 ) -> JSONResponse:
     stored = create_appointment_record(
         patient_name=patient_name,
@@ -622,6 +800,7 @@ async def create_admin_appointment(
         reason_for_visit=reason_for_visit,
         source="admin",
         status=status,  # type: ignore[arg-type]
+        notes=notes,
     )
     return JSONResponse({"message": "Admin appointment saved", "appointment": stored.model_dump()})
 
@@ -634,6 +813,52 @@ async def update_appointment_status(appointment_id: str, status: str = Form(...)
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Appointment not found")
     return JSONResponse({"message": "Appointment status updated"})
+
+
+@app.post("/api/appointments/{appointment_id}/update")
+async def update_appointment(
+    appointment_id: str,
+    patient_name: str = Form(...),
+    phone_number: str = Form(...),
+    preferred_date: str = Form(...),
+    preferred_time: str = Form(...),
+    reason_for_visit: str = Form(...),
+    status: str = Form(...),
+    notes: str = Form(default=""),
+) -> JSONResponse:
+    with get_db() as db:
+        result = db.execute(
+            """
+            UPDATE appointments
+            SET patient_name = ?, phone_number = ?, preferred_date = ?, preferred_time = ?, reason_for_visit = ?, status = ?, notes = ?
+            WHERE id = ?
+            """,
+            (patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, notes, appointment_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+    return JSONResponse({"message": "Appointment updated"})
+
+
+@app.post("/api/appointments/{appointment_id}/delete")
+async def delete_appointment(appointment_id: str) -> JSONResponse:
+    with get_db() as db:
+        result = db.execute("DELETE FROM appointments WHERE id = ?", (appointment_id,))
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+    return JSONResponse({"message": "Appointment deleted"})
+
+
+@app.post("/api/calls/{call_id}/lead-score")
+async def update_call_lead_score(call_id: str, lead_score: str = Form(...)) -> JSONResponse:
+    with get_db() as db:
+        result = db.execute("UPDATE call_records SET lead_score = ? WHERE id = ?", (lead_score, call_id))
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Call not found")
+    return JSONResponse({"message": "Call lead score updated"})
 
 
 @app.post("/api/slots")
@@ -669,25 +894,13 @@ async def update_settings(payload: ClinicSettingsInput) -> JSONResponse:
     return JSONResponse({"message": "Clinic settings updated", "settings": fetch_clinic_settings()})
 
 
-def csv_response(filename: str, fieldnames: list[str], rows: list[dict[str, object]]) -> StreamingResponse:
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-    writer.writeheader()
-    writer.writerows(rows)
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
 @app.get("/api/export/appointments.csv")
 async def export_appointments_csv() -> StreamingResponse:
     appointments = fetch_appointments(limit=1000)
     rows = [item.model_dump() for item in appointments]
     return csv_response(
         "dentvoice-appointments.csv",
-        ["id", "patient_name", "phone_number", "preferred_date", "preferred_time", "reason_for_visit", "status", "source", "created_at"],
+        ["id", "patient_name", "phone_number", "preferred_date", "preferred_time", "reason_for_visit", "status", "source", "notes", "created_at"],
         rows,
     )
 
@@ -703,13 +916,14 @@ async def export_calls_csv() -> StreamingResponse:
             "intent": item.intent,
             "summary": item.summary,
             "urgent": item.urgent,
+            "lead_score": item.lead_score,
             "created_at": item.created_at,
         }
         for item in calls
     ]
     return csv_response(
         "dentvoice-calls.csv",
-        ["id", "caller_number", "patient_name", "intent", "summary", "urgent", "created_at"],
+        ["id", "caller_number", "patient_name", "intent", "summary", "urgent", "lead_score", "created_at"],
         rows,
     )
 
@@ -750,12 +964,7 @@ async def process_main_menu(
         return Response(content=xml, media_type="application/xml")
 
     if selection == "2" or "timing" in speech or "hours" in speech:
-        create_call_record(
-            caller_number=From,
-            patient_name=None,
-            intent="faq",
-            summary="Caller asked for clinic timings in the live voice flow.",
-        )
+        create_call_record(caller_number=From, patient_name=None, intent="faq", summary="Caller asked for clinic timings in the live voice flow.")
         xml = twiml(
             say(f"Our clinic is open {settings['clinic_timings']}."),
             say("We will also send these details on WhatsApp. Thank you for calling."),
@@ -764,12 +973,7 @@ async def process_main_menu(
         return Response(content=xml, media_type="application/xml")
 
     if selection == "3" or "location" in speech or "address" in speech:
-        create_call_record(
-            caller_number=From,
-            patient_name=None,
-            intent="directions",
-            summary="Caller asked for clinic location in the live voice flow.",
-        )
+        create_call_record(caller_number=From, patient_name=None, intent="directions", summary="Caller asked for clinic location in the live voice flow.")
         xml = twiml(
             say(f"Our clinic is located at {settings['clinic_address']}."),
             say("We will send the address on WhatsApp. Thank you for calling."),
@@ -858,19 +1062,13 @@ async def process_booking_reason(
         caller_number=From,
         patient_name=session.patient_name,
         intent="appointment_booking",
-        summary=(
-            f"Live voice booking completed for {appointment.patient_name} on "
-            f"{appointment.preferred_date} at {appointment.preferred_time}."
-        ),
+        summary=f"Live voice booking completed for {appointment.patient_name} on {appointment.preferred_date} at {appointment.preferred_time}.",
         appointment_request=appointment,
     )
     call_sessions.pop(CallSid, None)
 
     xml = twiml(
-        say(
-            f"Thank you {appointment.patient_name}. Your appointment is booked for "
-            f"{appointment.preferred_date} at {appointment.preferred_time}."
-        ),
+        say(f"Thank you {appointment.patient_name}. Your appointment is booked for {appointment.preferred_date} at {appointment.preferred_time}."),
         say("We have sent the details on WhatsApp. We look forward to seeing you."),
     )
     return Response(content=xml, media_type="application/xml")

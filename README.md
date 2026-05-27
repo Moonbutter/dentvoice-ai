@@ -4,6 +4,7 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 
 - A FastAPI backend
 - A clinic dashboard UI
+- A public landing page
 - Real-time Twilio-style call handling
 - Live appointment capture during the call
 - Emergency detection
@@ -13,6 +14,10 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Admin booking form and clinic settings
 - Editable booking slots
 - CSV export for appointments and call logs
+- Search and filters for appointments and calls
+- Appointment notes, edit, and delete workflows
+- Lead scoring for call prioritization
+- Free analytics and docs pages
 
 ## Project Structure
 
@@ -44,7 +49,12 @@ uvicorn app.main:app --reload
 
 ## Main Endpoints
 
-- `GET /` - Dashboard
+- `GET /` - Public landing page
+- `GET /dashboard` - Admin dashboard
+- `GET /appointments` - Appointment management page
+- `GET /calls` - Call management page
+- `GET /analytics` - Analytics page
+- `GET /docs` - Product/docs page
 - `GET /health` - Health check for deployment
 - `GET /api/dashboard` - JSON dashboard data
 - `GET /api/available-slots` - Available booking slots
@@ -53,6 +63,9 @@ uvicorn app.main:app --reload
 - `POST /api/simulate-call` - Simulate an inbound patient call
 - `POST /api/appointments` - Create an appointment request
 - `POST /api/admin/appointments` - Create appointment from dashboard
+- `POST /api/appointments/{appointment_id}/update` - Edit appointment details and notes
+- `POST /api/appointments/{appointment_id}/delete` - Delete appointment
+- `POST /api/calls/{call_id}/lead-score` - Update call priority
 - `POST /api/settings` - Update clinic settings
 - `POST /api/slots` - Add booking slot
 - `POST /api/slots/{slot_id}/delete` - Remove booking slot
@@ -79,7 +92,6 @@ uvicorn app.main:app --reload
 ## Suggested Next Steps
 
 - Replace menu-based slot selection with OpenAI-powered natural extraction
-- Add search and filtering for larger clinics
 - Connect real Twilio voice and WhatsApp APIs
 - Add login, clinic settings, and user roles
 - Integrate calendar and appointment confirmation workflows
