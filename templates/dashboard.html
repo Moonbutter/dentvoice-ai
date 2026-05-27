@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DentVoice AI Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">AI Receptionist for Dental Clinics</p>
+        <h1>DentVoice AI</h1>
+        <p class="hero-copy">A voice-first front desk for Indian dental clinics that answers calls, captures appointments, detects emergencies, and follows up on WhatsApp.</p>
+      </div>
+      <div class="hero-actions">
+        <button id="seed-demo" class="primary-button">Load Demo Data</button>
+        <button id="simulate-call" class="secondary-button">Simulate New Call</button>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <span class="stat-label">Appointments</span>
+        <strong class="stat-value">{{ stats.appointments }}</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Calls Logged</span>
+        <strong class="stat-value">{{ stats.calls }}</strong>
+      </article>
+      <article class="stat-card alert">
+        <span class="stat-label">Emergencies</span>
+        <strong class="stat-value">{{ stats.emergencies }}</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">WhatsApp Messages</span>
+        <strong class="stat-value">{{ stats.messages }}</strong>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Appointment Requests</h2>
+          <p>Recent bookings captured by the AI receptionist</p>
+        </div>
+        <div class="panel-body">
+          {% if appointments %}
+            <ul class="record-list">
+              {% for item in appointments %}
+                <li>
+                  <div>
+                    <strong>{{ item.patient_name }}</strong>
+                    <span>{{ item.reason_for_visit }}</span>
+                  </div>
+                  <div class="record-meta">
+                    <span>{{ item.preferred_date }}</span>
+                    <span>{{ item.preferred_time }}</span>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No appointment requests yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Call Summaries</h2>
+          <p>AI-generated summaries and detected intent</p>
+        </div>
+        <div class="panel-body">
+          {% if call_records %}
+            <ul class="record-list">
+              {% for item in call_records %}
+                <li>
+                  <div>
+                    <strong>{{ item.intent.replace("_", " ").title() }}</strong>
+                    <span>{{ item.summary }}</span>
+                  </div>
+                  <div class="record-meta">
+                    <span>{{ item.patient_name or item.caller_number }}</span>
+                    {% if item.urgent %}<span class="pill urgent">Urgent</span>{% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No calls processed yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>WhatsApp Follow-Ups</h2>
+          <p>Messages sent after calls and booking requests</p>
+        </div>
+        <div class="panel-body">
+          {% if messages %}
+            <ul class="message-list">
+              {% for item in messages %}
+                <li>
+                  <strong>{{ item.phone_number }}</strong>
+                  <p>{{ item.message }}</p>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No messages sent yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>FAQs the AI Can Handle</h2>
+          <p>Common repetitive front-desk questions</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in faqs %}
+              <li>
+                <strong>{{ item.question }}</strong>
+                <span>{{ item.answer }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Live Booking Slots</h2>
+          <p>Options offered during the real-time call flow</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in slots %}
+              <li>
+                <strong>Option {{ item.option }}</strong>
+                <span>{{ item.date }} at {{ item.time }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
