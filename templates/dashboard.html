@@ -14,12 +14,18 @@
     <section class="hero">
       <div>
         <p class="eyebrow">AI Receptionist for Dental Clinics</p>
-        <h1>DentVoice AI</h1>
-        <p class="hero-copy">A voice-first front desk for Indian dental clinics that answers calls, captures appointments, detects emergencies, and follows up on WhatsApp.</p>
+        <h1>{{ settings.clinic_name }}</h1>
+        <p class="hero-copy">A voice-first front desk for Indian dental clinics that answers calls, captures appointments, detects emergencies, and follows up on WhatsApp. The dashboard now stores data persistently, supports admin bookings, slot management, and free CSV exports.</p>
+        <div class="hero-meta">
+          <span>{{ settings.clinic_timings }}</span>
+          <span>{{ settings.clinic_address }}</span>
+        </div>
       </div>
       <div class="hero-actions">
         <button id="seed-demo" class="primary-button">Load Demo Data</button>
         <button id="simulate-call" class="secondary-button">Simulate New Call</button>
+        <a class="secondary-button link-button" href="/api/export/appointments.csv">Export Appointments CSV</a>
+        <a class="secondary-button link-button" href="/api/export/calls.csv">Export Calls CSV</a>
       </div>
     </section>
 
@@ -45,6 +51,72 @@
     <section class="content-grid">
       <article class="panel">
         <div class="panel-header">
+          <h2>Admin Booking</h2>
+          <p>Create appointments manually from the dashboard</p>
+        </div>
+        <div class="panel-body">
+          <form id="appointment-form" class="stack-form">
+            <label>
+              <span>Patient name</span>
+              <input name="patient_name" required>
+            </label>
+            <label>
+              <span>Phone number</span>
+              <input name="phone_number" required>
+            </label>
+            <div class="split-grid">
+              <label>
+                <span>Date</span>
+                <input type="date" name="preferred_date" required>
+              </label>
+              <label>
+                <span>Time</span>
+                <input name="preferred_time" placeholder="5:30 PM" required>
+              </label>
+            </div>
+            <label>
+              <span>Reason for visit</span>
+              <input name="reason_for_visit" required>
+            </label>
+            <label>
+              <span>Status</span>
+              <select name="status">
+                {% for status in statuses %}
+                  <option value="{{ status }}">{{ status.replace("_", " ").title() }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit" class="primary-button">Save Appointment</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Clinic Settings</h2>
+          <p>Edit the business details used across the dashboard and call flow</p>
+        </div>
+        <div class="panel-body">
+          <form id="settings-form" class="stack-form json-form">
+            <label>
+              <span>Clinic name</span>
+              <input name="clinic_name" value="{{ settings.clinic_name }}" required>
+            </label>
+            <label>
+              <span>Clinic timings</span>
+              <input name="clinic_timings" value="{{ settings.clinic_timings }}" required>
+            </label>
+            <label>
+              <span>Clinic address</span>
+              <input name="clinic_address" value="{{ settings.clinic_address }}" required>
+            </label>
+            <button type="submit" class="primary-button">Update Settings</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
           <h2>Appointment Requests</h2>
           <p>Recent bookings captured by the AI receptionist</p>
         </div>
@@ -56,10 +128,12 @@
                   <div>
                     <strong>{{ item.patient_name }}</strong>
                     <span>{{ item.reason_for_visit }}</span>
+                    <span class="muted-line">{{ item.phone_number }}</span>
                   </div>
                   <div class="record-meta">
                     <span>{{ item.preferred_date }}</span>
                     <span>{{ item.preferred_time }}</span>
+                    <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
                   </div>
                 </li>
               {% endfor %}
@@ -120,7 +194,7 @@
 
       <article class="panel">
         <div class="panel-header">
-          <h2>FAQs the AI Can Handle</h2>
+          <h2>FAQ Knowledge</h2>
           <p>Common repetitive front-desk questions</p>
         </div>
         <div class="panel-body">
@@ -137,15 +211,31 @@
 
       <article class="panel">
         <div class="panel-header">
-          <h2>Live Booking Slots</h2>
-          <p>Options offered during the real-time call flow</p>
+          <h2>Slot Management</h2>
+          <p>Add or remove live booking slots offered during calls</p>
         </div>
         <div class="panel-body">
-          <ul class="faq-list">
+          <form id="slot-form" class="stack-form json-form compact-form">
+            <div class="split-grid">
+              <label>
+                <span>Date</span>
+                <input type="date" name="date" required>
+              </label>
+              <label>
+                <span>Time</span>
+                <input name="time" placeholder="11:00 AM" required>
+              </label>
+            </div>
+            <button type="submit" class="primary-button">Add Slot</button>
+          </form>
+          <ul class="faq-list top-gap">
             {% for item in slots %}
               <li>
-                <strong>Option {{ item.option }}</strong>
-                <span>{{ item.date }} at {{ item.time }}</span>
+                <div>
+                  <strong>Option {{ item.option }}</strong>
+                  <span>{{ item.date }} at {{ item.time }}</span>
+                </div>
+                <button class="danger-button slot-delete" data-slot-id="{{ item.id }}">Delete</button>
               </li>
             {% endfor %}
           </ul>

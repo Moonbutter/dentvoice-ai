@@ -9,6 +9,10 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Emergency detection
 - WhatsApp follow-up stubs
 - A Twilio-compatible voice webhook flow
+- SQLite persistence for free local storage
+- Admin booking form and clinic settings
+- Editable booking slots
+- CSV export for appointments and call logs
 
 ## Project Structure
 
@@ -44,8 +48,14 @@ uvicorn app.main:app --reload
 - `GET /health` - Health check for deployment
 - `GET /api/dashboard` - JSON dashboard data
 - `GET /api/available-slots` - Available booking slots
+- `GET /api/export/appointments.csv` - Export appointments
+- `GET /api/export/calls.csv` - Export calls
 - `POST /api/simulate-call` - Simulate an inbound patient call
 - `POST /api/appointments` - Create an appointment request
+- `POST /api/admin/appointments` - Create appointment from dashboard
+- `POST /api/settings` - Update clinic settings
+- `POST /api/slots` - Add booking slot
+- `POST /api/slots/{slot_id}/delete` - Remove booking slot
 - `POST /voice/incoming` - Twilio voice webhook
 - `POST /voice/process-main-menu` - Handle live menu selection
 - `POST /voice/process-booking-name` - Capture patient name by voice
@@ -69,7 +79,7 @@ uvicorn app.main:app --reload
 ## Suggested Next Steps
 
 - Replace menu-based slot selection with OpenAI-powered natural extraction
-- Add Supabase or MongoDB persistence
+- Add search and filtering for larger clinics
 - Connect real Twilio voice and WhatsApp APIs
 - Add login, clinic settings, and user roles
 - Integrate calendar and appointment confirmation workflows
