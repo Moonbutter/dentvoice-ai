@@ -22,6 +22,7 @@
         </div>
       </div>
       <div class="hero-actions">
+        <a class="secondary-button link-button" href="/">View Landing Page</a>
         <button id="seed-demo" class="primary-button">Load Demo Data</button>
         <button id="simulate-call" class="secondary-button">Simulate New Call</button>
         <a class="secondary-button link-button" href="/api/export/appointments.csv">Export Appointments CSV</a>
@@ -133,7 +134,13 @@
                   <div class="record-meta">
                     <span>{{ item.preferred_date }}</span>
                     <span>{{ item.preferred_time }}</span>
-                    <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
+                    <form class="status-form" data-appointment-id="{{ item.id }}">
+                      <select name="status" class="status-select">
+                        {% for status in statuses %}
+                          <option value="{{ status }}" {% if item.status == status %}selected{% endif %}>{{ status.replace("_", " ").title() }}</option>
+                        {% endfor %}
+                      </select>
+                    </form>
                   </div>
                 </li>
               {% endfor %}

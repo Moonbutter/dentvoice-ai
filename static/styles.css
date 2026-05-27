@@ -26,12 +26,14 @@ body {
     linear-gradient(180deg, #fbf7f2 0%, var(--bg) 100%);
 }
 
+.landing-shell,
 .page-shell {
   width: min(1240px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0 48px;
 }
 
+.landing-hero,
 .hero {
   display: flex;
   justify-content: space-between;
@@ -44,6 +46,51 @@ body {
     linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 247, 240, 0.92)),
     rgba(255, 255, 255, 0.72);
   box-shadow: var(--shadow);
+}
+
+.landing-copy {
+  flex: 1;
+}
+
+.landing-card {
+  width: min(360px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.landing-card-label {
+  margin: 0 0 14px;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 22px;
+}
+
+.feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.feature-list li {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(20, 108, 120, 0.06);
+  color: var(--ink);
+  line-height: 1.5;
 }
 
 .eyebrow {
@@ -279,6 +326,18 @@ select:focus {
   margin-top: 4px;
 }
 
+.status-form {
+  margin: 0;
+}
+
+.status-select {
+  min-width: 160px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .record-meta {
   display: flex;
   flex-direction: column;
@@ -315,13 +374,16 @@ select:focus {
 }
 
 @media (max-width: 900px) {
+  .landing-hero,
   .hero,
   .stats-grid,
+  .landing-grid,
   .content-grid,
   .split-grid {
     grid-template-columns: 1fr;
   }
 
+  .landing-hero,
   .hero {
     align-items: start;
     flex-direction: column;

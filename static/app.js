@@ -109,3 +109,16 @@ document.querySelectorAll(".slot-delete").forEach((button) => {
     }
   });
 });
+
+document.querySelectorAll(".status-form").forEach((form) => {
+  form.addEventListener("change", async () => {
+    try {
+      const data = new FormData();
+      data.append("status", form.status.value);
+      await postForm(`/api/appointments/${form.dataset.appointmentId}/status`, data);
+      refreshPage();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+});

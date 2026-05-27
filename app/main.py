@@ -521,6 +521,12 @@ init_db()
 
 
 @app.get("/", response_class=HTMLResponse)
+async def landing_page(request: Request) -> HTMLResponse:
+    context = build_dashboard_context()
+    return templates.TemplateResponse(request, "landing.html", context)
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
     context = build_dashboard_context()
     return templates.TemplateResponse(request, "dashboard.html", context)

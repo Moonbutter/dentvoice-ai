@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="landing-shell">
+    <section class="landing-hero">
+      <div class="landing-copy">
+        <p class="eyebrow">Voice AI for Dental Clinics</p>
+        <h1>DentVoice AI answers calls, captures appointments, and keeps your front desk moving.</h1>
+        <p class="hero-copy">A 24/7 AI receptionist built for Indian dental clinics. It handles inbound calls, supports appointment booking, flags urgent cases, and gives your team a live operating dashboard.</p>
+        <div class="hero-actions">
+          <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+          <a class="secondary-button link-button" href="https://github.com/Moonbutter/dentvoice-ai">View GitHub</a>
+        </div>
+        <div class="hero-meta">
+          <span>{{ stats.appointments }} saved appointments</span>
+          <span>{{ stats.calls }} call records</span>
+          <span>{{ stats.emergencies }} emergency flags</span>
+        </div>
+      </div>
+      <div class="landing-card">
+        <p class="landing-card-label">What it already does</p>
+        <ul class="feature-list">
+          <li>Inbound call workflow for appointment booking</li>
+          <li>Persistent clinic data with SQLite</li>
+          <li>Editable clinic settings and booking slots</li>
+          <li>CSV export for operations tracking</li>
+          <li>Twilio-compatible voice webhook flow</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="landing-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Built for Real Clinic Workflows</h2>
+          <p>Specialized for dental front-desk operations instead of generic chatbot tasks</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li>
+              <strong>Appointment capture</strong>
+              <span>Patients can move through a booking flow and get structured follow-up.</span>
+            </li>
+            <li>
+              <strong>Urgent case routing</strong>
+              <span>Emergency-style calls are highlighted for fast human review.</span>
+            </li>
+            <li>
+              <strong>Clinic operations view</strong>
+              <span>The dashboard tracks appointments, calls, messages, and slot availability.</span>
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Live Product Links</h2>
+          <p>Use these to review the project, demo it, or add it to LinkedIn</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li>
+              <strong>Dashboard</strong>
+              <span><a href="/dashboard">/dashboard</a></span>
+            </li>
+            <li>
+              <strong>Health check</strong>
+              <span><a href="/health">/health</a></span>
+            </li>
+            <li>
+              <strong>GitHub repository</strong>
+              <span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span>
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>FAQ Coverage</h2>
+          <p>Examples of repetitive front-desk questions handled by the current system</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in faqs %}
+              <li>
+                <strong>{{ item.question }}</strong>
+                <span>{{ item.answer }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Current Booking Slots</h2>
+          <p>Slots offered to callers during the live voice booking flow</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in slots %}
+              <li>
+                <strong>Option {{ item.option }}</strong>
+                <span>{{ item.date }} at {{ item.time }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
