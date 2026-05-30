@@ -766,6 +766,13 @@ textarea {
   margin: 0;
 }
 
+.onboarding-progress {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .onboarding-step {
   padding: 16px 18px;
   border-radius: 20px;
@@ -778,6 +785,7 @@ textarea {
   opacity: 1;
   border-color: rgba(20, 108, 120, 0.24);
   background: rgba(20, 108, 120, 0.08);
+  box-shadow: 0 14px 28px rgba(20, 108, 120, 0.08);
 }
 
 .onboarding-step strong,
@@ -788,6 +796,12 @@ textarea {
 .onboarding-step span {
   margin-top: 6px;
   color: var(--muted);
+}
+
+#back-onboarding:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 @media (max-width: 900px) {

@@ -200,14 +200,23 @@ function setupOnboarding() {
   const steps = [...modal.querySelectorAll(".onboarding-step")];
   const nextButton = document.getElementById("next-onboarding");
   const skipButton = document.getElementById("skip-onboarding");
+  const backButton = document.getElementById("back-onboarding");
+  const progressLabel = document.getElementById("onboarding-progress");
   let currentStep = 0;
 
   const syncSteps = () => {
     steps.forEach((step, index) => {
       step.classList.toggle("is-active", index === currentStep);
+      step.hidden = index !== currentStep;
     });
+    if (progressLabel) {
+      progressLabel.textContent = `Step ${currentStep + 1} of ${steps.length}`;
+    }
     if (nextButton) {
       nextButton.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
+    }
+    if (backButton) {
+      backButton.disabled = currentStep === 0;
     }
   };
 
@@ -225,6 +234,14 @@ function setupOnboarding() {
       return;
     }
     currentStep += 1;
+    syncSteps();
+  });
+
+  backButton?.addEventListener("click", () => {
+    if (currentStep === 0) {
+      return;
+    }
+    currentStep -= 1;
     syncSteps();
   });
 
