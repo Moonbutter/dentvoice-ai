@@ -42,6 +42,7 @@
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Status</h2><p>Operational state of saved bookings</p></div>
         <div class="panel-body">
+          <div class="chart-card-title">Status distribution</div>
           <div class="chart-stack">
             {% for item in analytics_charts.appointments_by_status %}
               <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
@@ -52,6 +53,7 @@
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Source</h2><p>Where bookings are coming from</p></div>
         <div class="panel-body">
+          <div class="chart-card-title">Source split</div>
           <div class="chart-stack">
             {% for item in analytics_charts.appointments_by_source %}
               <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
@@ -62,6 +64,7 @@
       <article class="panel">
         <div class="panel-header"><h2>Calls by Intent</h2><p>Why patients are reaching the clinic</p></div>
         <div class="panel-body">
+          <div class="chart-card-title">Intent mix</div>
           <div class="chart-stack">
             {% for item in analytics_charts.calls_by_intent %}
               <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
@@ -72,6 +75,7 @@
       <article class="panel">
         <div class="panel-header"><h2>Lead Scores</h2><p>How urgently the team should act</p></div>
         <div class="panel-body">
+          <div class="chart-card-title">Lead quality</div>
           <div class="chart-stack">
             {% for item in analytics_charts.calls_by_lead_score %}
               <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
@@ -82,6 +86,7 @@
       <article class="panel">
         <div class="panel-header"><h2>Receptionist Tasks</h2><p>Manual workflow still happening alongside AI</p></div>
         <div class="panel-body">
+          <div class="chart-card-title">Task progress</div>
           <div class="chart-stack">
             {% for item in analytics_charts.tasks_by_status %}
               <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
@@ -92,6 +97,11 @@
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Last 7 Days</h2><p>Simple activity trend without paid analytics tools</p></div>
         <div class="panel-body">
+          <div class="chart-legend">
+            <span><i class="legend-swatch appointments"></i>Appointments</span>
+            <span><i class="legend-swatch calls"></i>Calls</span>
+            <span><i class="legend-swatch contacts"></i>Demo Requests</span>
+          </div>
           <div class="trend-chart">
             {% for item in analytics_charts.recent_days %}
               <div class="trend-day">
@@ -105,6 +115,17 @@
               </div>
             {% endfor %}
           </div>
+        </div>
+      </article>
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>What These Charts Mean</h2><p>A quick learning layer for understanding the analytics</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Appointments by Status</strong><span>Shows whether bookings are getting confirmed and completed instead of staying pending.</span></li>
+            <li><strong>Source and Intent</strong><span>Helps you understand where demand comes from and what patients usually call about.</span></li>
+            <li><strong>Lead Scores</strong><span>Highlights which calls deserve fast follow-up from the clinic team.</span></li>
+            <li><strong>7-Day Trend</strong><span>Gives a lightweight activity graph even before adding any paid analytics stack.</span></li>
+          </ul>
         </div>
       </article>
     </section>

@@ -545,6 +545,15 @@ textarea {
   gap: 14px;
 }
 
+.chart-card-title {
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .chart-row {
   display: grid;
   grid-template-columns: minmax(120px, 0.9fr) 1fr auto;
@@ -559,10 +568,11 @@ textarea {
 }
 
 .chart-bar {
-  height: 14px;
+  height: 16px;
   border-radius: 999px;
   background: rgba(20, 108, 120, 0.08);
   overflow: hidden;
+  border: 1px solid rgba(20, 108, 120, 0.08);
 }
 
 .chart-bar i {
@@ -570,6 +580,41 @@ textarea {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(135deg, var(--accent), var(--brand));
+  min-width: 10px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.legend-swatch.appointments {
+  background: linear-gradient(180deg, #ff9b6b, var(--brand));
+}
+
+.legend-swatch.calls {
+  background: linear-gradient(180deg, #69c9d5, var(--accent));
+}
+
+.legend-swatch.contacts {
+  background: linear-gradient(180deg, #90d36b, #4f9c2f);
 }
 
 .trend-chart {

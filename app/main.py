@@ -112,6 +112,7 @@ APPOINTMENT_STATUSES = ["new", "confirmed", "completed", "cancelled", "needs_fol
 CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "faq", "emergency", "general"]
 LEAD_SCORES = ["hot", "warm", "cold"]
 TASK_STATUSES = ["open", "in_progress", "done"]
+APPOINTMENT_SOURCES = ["admin", "voice_call", "simulated_call", "api"]
 
 call_sessions: dict[str, CallSession] = {}
 
@@ -569,18 +570,23 @@ def fetch_analytics() -> dict[str, object]:
     }
 
 
-def build_chart(counter_map: dict[str, int]) -> list[dict[str, object]]:
-    if not counter_map:
+def build_chart(counter_map: dict[str, int], ordered_keys: list[str] | None = None) -> list[dict[str, object]]:
+    if ordered_keys:
+        normalized = {key: int(counter_map.get(key, 0)) for key in ordered_keys}
+    else:
+        normalized = dict(counter_map)
+
+    if not normalized:
         return []
 
-    peak = max(counter_map.values()) or 1
+    peak = max(normalized.values()) or 1
     rows = []
-    for label, value in counter_map.items():
+    for label, value in normalized.items():
         rows.append(
             {
                 "label": label.replace("_", " ").title(),
                 "value": value,
-                "percent": round((value / peak) * 100, 1),
+                "percent": round((value / peak) * 100, 1) if value else 6,
             }
         )
     return rows
@@ -595,9 +601,9 @@ def build_trend_chart(days: list[dict[str, object]]) -> list[dict[str, object]]:
             "appointments": item["appointments"],
             "calls": item["calls"],
             "contacts": item["contacts"],
-            "appointment_percent": round((int(item["appointments"]) / peak) * 100, 1),
-            "call_percent": round((int(item["calls"]) / peak) * 100, 1),
-            "contact_percent": round((int(item["contacts"]) / peak) * 100, 1),
+            "appointment_percent": round((int(item["appointments"]) / peak) * 100, 1) if int(item["appointments"]) else 4,
+            "call_percent": round((int(item["calls"]) / peak) * 100, 1) if int(item["calls"]) else 4,
+            "contact_percent": round((int(item["contacts"]) / peak) * 100, 1) if int(item["contacts"]) else 4,
         }
         for item in days
     ]
@@ -896,11 +902,11 @@ def build_dashboard_context() -> dict[str, object]:
         "branding": branding,
         "analytics": analytics,
         "analytics_charts": {
-            "appointments_by_status": build_chart(analytics["appointments_by_status"]),
-            "appointments_by_source": build_chart(analytics["appointments_by_source"]),
-            "calls_by_intent": build_chart(analytics["calls_by_intent"]),
-            "calls_by_lead_score": build_chart(analytics["calls_by_lead_score"]),
-            "tasks_by_status": build_chart(analytics["tasks_by_status"]),
+            "appointments_by_status": build_chart(analytics["appointments_by_status"], APPOINTMENT_STATUSES),
+            "appointments_by_source": build_chart(analytics["appointments_by_source"], APPOINTMENT_SOURCES),
+            "calls_by_intent": build_chart(analytics["calls_by_intent"], CALL_INTENTS),
+            "calls_by_lead_score": build_chart(analytics["calls_by_lead_score"], LEAD_SCORES),
+            "tasks_by_status": build_chart(analytics["tasks_by_status"], TASK_STATUSES),
             "recent_days": build_trend_chart(analytics["recent_days"]),
         },
         "statuses": APPOINTMENT_STATUSES,
