@@ -19,6 +19,7 @@
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
+        <a class="secondary-button link-button" href="/calendar">Calendar</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
@@ -47,6 +48,15 @@
             </select>
           </label>
           <label><span>Date</span><input type="date" name="preferred_date" value="{{ filters.preferred_date }}"></label>
+          <label>
+            <span>Sort</span>
+            <select name="sort">
+              <option value="created_desc" {% if filters.sort == "created_desc" %}selected{% endif %}>Newest first</option>
+              <option value="date_asc" {% if filters.sort == "date_asc" %}selected{% endif %}>Appointment date</option>
+              <option value="date_desc" {% if filters.sort == "date_desc" %}selected{% endif %}>Latest appointment</option>
+              <option value="name_asc" {% if filters.sort == "name_asc" %}selected{% endif %}>Patient A-Z</option>
+            </select>
+          </label>
           <button type="submit" class="primary-button">Apply Filters</button>
         </form>
         <div class="saved-filter-row">

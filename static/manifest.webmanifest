@@ -1,0 +1,17 @@
+{
+  "name": "DentVoice AI",
+  "short_name": "DentVoice",
+  "description": "AI receptionist platform for dental clinics",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff7f1",
+  "theme_color": "#146c78",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -21,6 +21,7 @@
         <form method="get" action="/leads" class="filter-grid" data-save-filters="leads">
           <label><span>Search lead</span><input name="q" value="{{ filters.q }}" placeholder="Name, clinic, phone, note"></label>
           <label><span>Status</span><select name="status"><option value="">All</option>{% for item in contact_statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item.title() }}</option>{% endfor %}</select></label>
+          <label><span>Sort</span><select name="sort"><option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest first</option><option value="status" {% if filters.sort == "status" %}selected{% endif %}>By status</option><option value="name" {% if filters.sort == "name" %}selected{% endif %}>Name A-Z</option></select></label>
           <div class="form-actions-row">
             <button type="submit" class="primary-button">Apply</button>
             <button type="button" class="secondary-button save-filter-button" data-save-filter-target="leads">Save Filter</button>

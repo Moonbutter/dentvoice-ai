@@ -19,6 +19,7 @@
       <div class="panel-body">
         <form method="get" action="/patients" class="filter-grid short-filter-grid">
           <label><span>Search patient</span><input name="q" value="{{ filters.q }}" placeholder="Name, phone, notes"></label>
+          <label><span>Sort</span><select name="sort"><option value="latest_desc" {% if filters.sort == "latest_desc" %}selected{% endif %}>Latest visit</option><option value="visits_desc" {% if filters.sort == "visits_desc" %}selected{% endif %}>Most visits</option><option value="name_asc" {% if filters.sort == "name_asc" %}selected{% endif %}>Name A-Z</option></select></label>
           <button type="submit" class="primary-button">Search</button>
         </form>
       </div>

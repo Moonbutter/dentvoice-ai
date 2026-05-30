@@ -116,6 +116,24 @@
           {% endif %}
         </div>
       </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Patient Timeline</h2><p>All key activity in one chronological view</p></div>
+        <div class="panel-body">
+          {% if patient_detail.timeline %}
+            <ul class="faq-list">
+              {% for item in patient_detail.timeline %}
+                <li>
+                  <div><strong>{{ item.title }}</strong><span>{{ item.detail }}</span></div>
+                  <div class="record-meta"><span>{{ item.kind.title() }}</span><span>{{ item.date[:10] }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No timeline activity yet.</p>
+          {% endif %}
+        </div>
+      </article>
     </section>
 
     <div id="toast" class="toast" hidden></div>

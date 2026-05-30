@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="{{ branding.accent_color }}">
   <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
 </head>
 <body style="--accent: {{ branding.accent_color }};">
@@ -33,13 +35,16 @@
           <button type="submit" class="primary-button">Log In</button>
         </form>
         <div class="auth-help">
-          <strong>Default local login</strong>
-          <span>Username: {{ default_admin_username }}</span>
+          <strong>Default local logins</strong>
+          <span>Admin: admin / dentvoice123</span>
+          <span>Receptionist: reception / dentvoice123</span>
+          <span>Clinic switching is available after login.</span>
           <span>Password: dentvoice123</span>
-          <span>You can change both from the dashboard after logging in.</span>
+          <span>New clinic workspaces also generate admin and receptionist users automatically.</span>
         </div>
       </div>
     </section>
   </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

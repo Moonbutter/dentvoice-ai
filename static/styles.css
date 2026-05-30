@@ -339,7 +339,7 @@ button:hover,
 }
 
 .short-filter-grid {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .saved-filter-row {

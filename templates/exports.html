@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Export Center - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Export Center</p><h1>Download clinic data and reports in CSV format.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/analytics">Analytics</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+    <section class="content-grid">
+      <article class="panel"><div class="panel-header"><h2>Appointments</h2><p>Bookings, status, notes, and sources</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/appointments.csv">Download appointments CSV</a></div></article>
+      <article class="panel"><div class="panel-header"><h2>Calls</h2><p>Call logs, lead scores, and internal notes</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/calls.csv">Download calls CSV</a></div></article>
+      <article class="panel"><div class="panel-header"><h2>Leads</h2><p>Demo request CRM pipeline</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/leads.csv">Download leads CSV</a></div></article>
+      <article class="panel"><div class="panel-header"><h2>Tasks</h2><p>Receptionist work queue with priorities</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/tasks.csv">Download tasks CSV</a></div></article>
+      <article class="panel"><div class="panel-header"><h2>Reminders</h2><p>Reminder queue and status history</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/reminders.csv">Download reminders CSV</a></div></article>
+    </section>
+  </main>
+</body>
+</html>

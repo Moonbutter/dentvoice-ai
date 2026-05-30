@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="{{ branding.accent_color }}">
   <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
 </head>
 <body style="--accent: {{ branding.accent_color }};">
@@ -25,10 +27,11 @@
           <span>{{ settings.clinic_timings }}</span>
           <span>{{ settings.clinic_address }}</span>
           <span>{{ stats.open_tasks }} open receptionist tasks</span>
+          <span>{{ current_role.replace("_", " ").title() }} role</span>
         </div>
       </div>
       <div class="hero-actions">
-        <a class="secondary-button link-button" href="/">View Landing Page</a>
+        <a class="secondary-button link-button" href="/clinic/{{ settings.slug }}">View Landing Page</a>
         <a class="secondary-button link-button" href="/appointments">Appointments</a>
         <a class="secondary-button link-button" href="/calls">Calls</a>
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
@@ -40,10 +43,63 @@
         <a class="secondary-button link-button" href="/missed-leads">Missed Leads</a>
         <a class="secondary-button link-button" href="/search">Search</a>
         <a class="secondary-button link-button" href="/audit">Audit</a>
+        <a class="secondary-button link-button" href="/exports">Exports</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
+
+    {% if current_role == "admin" %}
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <div class="split-grid">
+          <form id="clinic-switch-form" class="stack-form card-form">
+            <label><span>Active clinic workspace</span><select name="clinic_id">{% for clinic in clinics %}<option value="{{ clinic.id }}" {% if clinic.id == current_clinic_id %}selected{% endif %}>{{ clinic.clinic_name }}</option>{% endfor %}</select></label>
+            <button type="submit" class="secondary-button">Switch Clinic</button>
+          </form>
+          <form id="clinic-create-form" class="stack-form card-form">
+            <div class="split-grid">
+              <label><span>Clinic slug</span><input name="slug" placeholder="south-mumbai-dental" required></label>
+              <label><span>Clinic name</span><input name="clinic_name" placeholder="South Mumbai Dental" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Clinic timings</span><input name="clinic_timings" placeholder="Monday to Saturday, 9 AM to 8 PM" required></label>
+              <label><span>Clinic address</span><input name="clinic_address" placeholder="Lower Parel, Mumbai" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Tagline</span><input name="brand_tagline" placeholder="AI front desk for multi-chair clinics" required></label>
+              <label><span>Accent color</span><input type="color" name="accent_color" value="#146c78" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Logo text</span><input name="logo_text" maxlength="4" value="DV" required></label>
+              <label><span>Working days</span><input name="working_days" value="Mon,Tue,Wed,Thu,Fri,Sat" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Working hours</span><input name="working_hours" value="09:00-20:00" required></label>
+              <div class="top-gap-inline"><span class="muted-line">Admin and receptionist logins are created automatically.</span></div>
+            </div>
+            <button type="submit" class="primary-button">Create Clinic Workspace</button>
+          </form>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if notifications %}
+    <section class="panel filter-panel">
+      <div class="panel-header"><h2>Live Notifications</h2><p>Generated from urgent calls, high-priority tasks, and pending reminders</p></div>
+      <div class="panel-body">
+        <ul class="faq-list">
+          {% for item in notifications %}
+            <li>
+              <div><strong>{{ item.kind }}</strong><span>{{ item.message }}</span></div>
+              <div class="record-meta"><a class="link-inline" href="{{ item.href }}">Open</a></div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+    {% endif %}
 
     <section class="stats-grid wide-stats">
       <article class="stat-card"><span class="stat-label">Appointments</span><strong class="stat-value">{{ stats.appointments }}</strong></article>
@@ -76,6 +132,7 @@
         </div>
       </article>
 
+      {% if current_role == "admin" %}
       <article class="panel">
         <div class="panel-header"><h2>Clinic Settings</h2><p>Edit the business details used across the dashboard and call flow</p></div>
         <div class="panel-body">
@@ -89,13 +146,15 @@
               <label><span>Logo text</span><input name="logo_text" value="{{ branding.logo_text }}" maxlength="4" required></label>
             </div>
             <div class="split-grid">
-              <label><span>Admin username</span><input name="admin_username" value="{{ settings.admin_username }}" required></label>
-              <label><span>Admin password</span><input name="admin_password" value="{{ settings.admin_password }}" required></label>
+              <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" required></label>
+              <label><span>Working hours</span><input name="working_hours" value="{{ settings.working_hours }}" required></label>
             </div>
+            <label class="checkbox-row"><input type="checkbox" name="auto_callback_enabled" value="true" {% if settings.auto_callback_enabled %}checked{% endif %}><span>Auto-create callback tasks for missed high-intent calls</span></label>
             <button type="submit" class="primary-button">Update Settings</button>
           </form>
         </div>
       </article>
+      {% endif %}
 
       <article class="panel">
         <div class="panel-header"><h2>Analytics Snapshot</h2><p>Quick business health from the latest saved activity</p></div>
@@ -252,6 +311,7 @@
         </div>
       </article>
 
+      {% if current_role == "admin" %}
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>FAQ Manager</h2><p>Edit the answers the receptionist can use for common clinic questions</p></div>
         <div class="panel-body">
@@ -278,6 +338,7 @@
           </div>
         </div>
       </article>
+      {% endif %}
 
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Receptionist Task Board</h2><p>Open follow-ups, confirmations, and callbacks</p></div>
@@ -362,6 +423,7 @@
         </div>
       </article>
 
+      {% if current_role == "admin" %}
       <article class="panel">
         <div class="panel-header"><h2>Slot Management</h2><p>Add or remove live booking slots offered during calls</p></div>
         <div class="panel-body">
@@ -382,6 +444,7 @@
           </ul>
         </div>
       </article>
+      {% endif %}
 
       <article class="panel">
         <div class="panel-header"><h2>Upcoming Calendar</h2><p>Next few scheduled days at a glance</p></div>

@@ -188,6 +188,12 @@ function setupSavedFilters() {
 
 restorePendingToast();
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/service-worker.js").catch(() => {});
+  });
+}
+
 document.getElementById("seed-demo")?.addEventListener("click", async () => {
   try {
     await postJson("/api/demo/seed", {});
@@ -292,6 +298,28 @@ document.getElementById("appointment-form")?.addEventListener("submit", async (e
   }
 });
 
+document.getElementById("clinic-switch-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/clinic/switch", formData);
+    refreshPage("Clinic switched");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("clinic-create-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/clinics", formData);
+    refreshPage("Clinic workspace created");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 document.getElementById("task-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -366,8 +394,9 @@ document.getElementById("settings-form")?.addEventListener("submit", async (even
       brand_tagline: form.brand_tagline.value,
       accent_color: form.accent_color.value,
       logo_text: form.logo_text.value,
-      admin_username: form.admin_username.value,
-      admin_password: form.admin_password.value,
+      working_days: form.working_days.value,
+      working_hours: form.working_hours.value,
+      auto_callback_enabled: form.auto_callback_enabled.checked,
     });
     refreshPage("Clinic settings updated");
   } catch (error) {
@@ -432,8 +461,8 @@ document.querySelectorAll(".call-score-form").forEach((form) => {
     event.preventDefault();
     try {
       const formData = new FormData(form);
-      await postForm(`/api/calls/${form.dataset.callId}/lead-score`, formData);
-      refreshPage("Lead score updated");
+      await postForm(`/api/calls/${form.dataset.callId}/update`, formData);
+      refreshPage("Call record updated");
     } catch (error) {
       showToast(error.message, "error");
     }

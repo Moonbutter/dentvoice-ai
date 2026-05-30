@@ -19,6 +19,7 @@
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
+        <a class="secondary-button link-button" href="/missed-leads">Missed Leads</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
@@ -43,6 +44,14 @@
               {% for item in lead_scores %}
                 <option value="{{ item }}" {% if filters.lead_score == item %}selected{% endif %}>{{ item.title() }}</option>
               {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Sort</span>
+            <select name="sort">
+              <option value="created_desc" {% if filters.sort == "created_desc" %}selected{% endif %}>Newest first</option>
+              <option value="lead_desc" {% if filters.sort == "lead_desc" %}selected{% endif %}>Highest lead first</option>
+              <option value="intent_asc" {% if filters.sort == "intent_asc" %}selected{% endif %}>Intent A-Z</option>
             </select>
           </label>
           <label class="checkbox-row"><input type="checkbox" name="urgent_only" value="true" {% if filters.urgent_only %}checked{% endif %}><span>Urgent only</span></label>
@@ -83,7 +92,11 @@
                   {% endfor %}
                 </select>
               </label>
-              <button type="submit" class="primary-button">Save Score</button>
+              <label>
+                <span>Internal notes</span>
+                <input name="internal_notes" value="{{ item.internal_notes }}" placeholder="Missed call, asked for callback after 5 PM">
+              </label>
+              <button type="submit" class="primary-button">Save Call</button>
             </form>
           </div>
         </article>

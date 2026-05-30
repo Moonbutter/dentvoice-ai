@@ -15,24 +15,48 @@
       <div><p class="eyebrow">Calendar View</p><h1>Review appointments by day and spot load quickly.</h1></div>
       <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/appointments">Appointments</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
     </section>
-    <section class="content-grid single-column">
-      {% for day in calendar_entries %}
-        <article class="panel">
-          <div class="panel-header"><h2>{{ day.date }}</h2><p>{{ day.count }} appointment(s)</p></div>
-          <div class="panel-body">
-            <ul class="faq-list">
-              {% for item in day.appointments %}
-                <li>
-                  <div><strong>{{ item.preferred_time }} - {{ item.patient_name }}</strong><span>{{ item.reason_for_visit }}</span></div>
-                  <div class="record-meta"><span>{{ item.phone_number }}</span><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </article>
-      {% else %}
-        <article class="panel"><div class="panel-body"><p class="empty-state">No appointments scheduled yet.</p></div></article>
+    <section class="stats-grid">
+      {% for item in calendar_views.months %}
+        <article class="stat-card"><span class="stat-label">{{ item.month }}</span><strong class="stat-value">{{ item.appointments }}</strong><span>{{ item.days }} busy day(s)</span></article>
       {% endfor %}
+    </section>
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Weekly View</h2><p>Grouped schedule blocks for faster planning</p></div>
+        <div class="panel-body">
+          {% for week, items in calendar_views.weeks.items() %}
+            <div class="top-gap">
+              <strong>{{ week }}</strong>
+              <ul class="faq-list top-gap-inline">
+                {% for day in items %}
+                  <li><div><strong>{{ day.date }}</strong><span>{{ day.count }} appointment(s)</span></div></li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Daily Detail</h2><p>Review appointments by day and spot load quickly.</p></div>
+        <div class="panel-body">
+          {% for day in calendar_entries %}
+            <article class="card-form top-gap-inline">
+              <strong>{{ day.date }}</strong>
+              <span class="muted-line">{{ day.count }} appointment(s)</span>
+              <ul class="faq-list top-gap-inline">
+                {% for item in day.appointments %}
+                  <li>
+                    <div><strong>{{ item.preferred_time }} - {{ item.patient_name }}</strong><span>{{ item.reason_for_visit }}</span></div>
+                    <div class="record-meta"><span>{{ item.phone_number }}</span><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </article>
+          {% else %}
+            <p class="empty-state">No appointments scheduled yet.</p>
+          {% endfor %}
+        </div>
+      </article>
     </section>
   </main>
 </body>
