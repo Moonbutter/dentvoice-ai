@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
 </head>
 <body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
@@ -308,38 +308,9 @@
       </article>
     </section>
 
-    <section id="onboarding-modal" class="onboarding-modal" data-onboarding="dashboard" hidden>
-      <div class="onboarding-card">
-        <p class="eyebrow">Quick Walkthrough</p>
-        <h2>Welcome to the clinic control room.</h2>
-        <p class="onboarding-progress" id="onboarding-progress">Step 1 of 4</p>
-        <div class="onboarding-step is-active">
-          <strong>1. Start on the dashboard</strong>
-          <span>See appointments, calls, patients, and urgent items in one place.</span>
-        </div>
-        <div class="onboarding-step">
-          <strong>2. Use appointments and calls pages</strong>
-          <span>Filter records, save views in your browser, and keep your work organized.</span>
-        </div>
-        <div class="onboarding-step">
-          <strong>3. Track manual follow-ups</strong>
-          <span>Create receptionist tasks for callbacks, confirmations, and reschedules.</span>
-        </div>
-        <div class="onboarding-step">
-          <strong>4. Customize your clinic brand</strong>
-          <span>Update colors, logo text, tagline, and even local admin credentials.</span>
-        </div>
-        <div class="hero-actions">
-          <button type="button" class="secondary-button" id="back-onboarding">Back</button>
-          <button type="button" class="secondary-button" id="skip-onboarding">Skip</button>
-          <button type="button" class="primary-button" id="next-onboarding">Next</button>
-        </div>
-      </div>
-    </section>
-
     <div id="toast" class="toast" hidden></div>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

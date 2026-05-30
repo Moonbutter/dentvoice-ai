@@ -100,6 +100,7 @@ class ClinicSettingsInput(BaseModel):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "dentvoice.db"
+ASSET_VERSION = "20260530-4"
 
 FAQS = [
     FAQAnswer(question="What are your clinic timings?", answer="We are open Monday to Saturday from 9 AM to 8 PM."),
@@ -913,6 +914,7 @@ def build_dashboard_context() -> dict[str, object]:
         "lead_scores": LEAD_SCORES,
         "task_statuses": TASK_STATUSES,
         "default_admin_username": settings.get("admin_username", "admin"),
+        "asset_version": ASSET_VERSION,
     }
 
 

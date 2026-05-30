@@ -186,68 +186,6 @@ function setupSavedFilters() {
   });
 }
 
-function setupOnboarding() {
-  const modal = document.getElementById("onboarding-modal");
-  if (!modal) {
-    return;
-  }
-
-  const onboardingKey = `dentvoice_onboarding_seen_${modal.dataset.onboarding || "default"}`;
-  if (window.localStorage.getItem(onboardingKey) === "true") {
-    return;
-  }
-
-  const steps = [...modal.querySelectorAll(".onboarding-step")];
-  const nextButton = document.getElementById("next-onboarding");
-  const skipButton = document.getElementById("skip-onboarding");
-  const backButton = document.getElementById("back-onboarding");
-  const progressLabel = document.getElementById("onboarding-progress");
-  let currentStep = 0;
-
-  const syncSteps = () => {
-    steps.forEach((step, index) => {
-      step.classList.toggle("is-active", index === currentStep);
-      step.hidden = index !== currentStep;
-    });
-    if (progressLabel) {
-      progressLabel.textContent = `Step ${currentStep + 1} of ${steps.length}`;
-    }
-    if (nextButton) {
-      nextButton.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
-    }
-    if (backButton) {
-      backButton.disabled = currentStep === 0;
-    }
-  };
-
-  const closeModal = () => {
-    window.localStorage.setItem(onboardingKey, "true");
-    modal.hidden = true;
-  };
-
-  modal.hidden = false;
-  syncSteps();
-
-  nextButton?.addEventListener("click", () => {
-    if (currentStep >= steps.length - 1) {
-      closeModal();
-      return;
-    }
-    currentStep += 1;
-    syncSteps();
-  });
-
-  backButton?.addEventListener("click", () => {
-    if (currentStep === 0) {
-      return;
-    }
-    currentStep -= 1;
-    syncSteps();
-  });
-
-  skipButton?.addEventListener("click", closeModal);
-}
-
 restorePendingToast();
 
 document.getElementById("seed-demo")?.addEventListener("click", async () => {
@@ -411,4 +349,3 @@ document.querySelectorAll(".call-score-form").forEach((form) => {
 });
 
 setupSavedFilters();
-setupOnboarding();
