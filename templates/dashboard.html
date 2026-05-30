@@ -34,6 +34,8 @@
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
         <a class="secondary-button link-button" href="/calendar">Calendar</a>
         <a class="secondary-button link-button" href="/patients">Patients</a>
+        <a class="secondary-button link-button" href="/leads">Leads</a>
+        <a class="secondary-button link-button" href="/missed-leads">Missed Leads</a>
         <a class="secondary-button link-button" href="/audit">Audit</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
@@ -47,6 +49,7 @@
       <article class="stat-card"><span class="stat-label">WhatsApp Messages</span><strong class="stat-value">{{ stats.messages }}</strong></article>
       <article class="stat-card"><span class="stat-label">Patient Profiles</span><strong class="stat-value">{{ stats.patients }}</strong></article>
       <article class="stat-card"><span class="stat-label">Demo Requests</span><strong class="stat-value">{{ stats.contacts }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Missed Leads</span><strong class="stat-value">{{ stats.missed_leads }}</strong></article>
       <article class="stat-card"><span class="stat-label">Open Tasks</span><strong class="stat-value">{{ stats.open_tasks }}</strong></article>
     </section>
 
@@ -114,7 +117,7 @@
             <li><strong>Persistent SQLite storage</strong><span>Appointments, calls, slots, requests, and settings survive restarts.</span></li>
             <li><strong>Local authentication</strong><span>Admin pages now use a free built-in login flow instead of staying public.</span></li>
             <li><strong>Lead scoring</strong><span>Calls can be marked hot, warm, or cold based on urgency and booking likelihood.</span></li>
-            <li><strong>Saved filters and onboarding</strong><span>Browser-based saved filters and guided walkthroughs help staff learn the system faster.</span></li>
+            <li><strong>Saved filters and CRM workflows</strong><span>Teams can save views, manage demo requests, and recover missed leads from one admin workspace.</span></li>
             <li><strong>Double-booking protection</strong><span>Conflicting appointment slots are blocked automatically.</span></li>
           </ul>
         </div>
@@ -142,14 +145,28 @@
         <div class="panel-header"><h2>Recent Demo Requests</h2><p>Leads captured from the public landing page</p></div>
         <div class="panel-body">
           {% if contact_requests %}
-            <ul class="faq-list">
+            <div class="stack-list">
               {% for item in contact_requests %}
-                <li>
-                  <div><strong>{{ item.name }} - {{ item.clinic_name }}</strong><span>{{ item.message }}</span></div>
-                  <div class="record-meta"><span>{{ item.phone_number }}</span></div>
-                </li>
+                <form class="contact-request-form stack-form card-form" data-request-id="{{ item.id }}">
+                  <div class="task-card-top">
+                    <div>
+                      <strong>{{ item.name }} - {{ item.clinic_name }}</strong>
+                      <span>{{ item.message }}</span>
+                      <span class="muted-line">{{ item.phone_number }}</span>
+                    </div>
+                    <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
+                  </div>
+                  <div class="split-grid">
+                    <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.title() }}</option>{% endfor %}</select></label>
+                    <label><span>Owner notes</span><input name="owner_notes" value="{{ item.owner_notes }}" placeholder="Reached out, scheduled demo, follow up next week"></label>
+                  </div>
+                  <div class="row-actions">
+                    <button type="submit" class="secondary-button">Save Lead</button>
+                    <a class="link-inline" href="/leads">Open CRM</a>
+                  </div>
+                </form>
               {% endfor %}
-            </ul>
+            </div>
           {% else %}
             <p class="empty-state">No demo requests yet.</p>
           {% endif %}
@@ -164,7 +181,11 @@
               {% for item in patient_profiles %}
                 <li>
                   <div><strong>{{ item.patient_name }}</strong><span>{{ item.latest_reason }}</span></div>
-                  <div class="record-meta"><span>{{ item.appointment_count }} visits</span><span>{{ item.latest_visit_date }}</span></div>
+                  <div class="record-meta">
+                    <span>{{ item.appointment_count }} visits</span>
+                    <span>{{ item.latest_visit_date }}</span>
+                    <a class="link-inline" href="/patients/detail?phone={{ item.patient_query }}">Open profile</a>
+                  </div>
                 </li>
               {% endfor %}
             </ul>
@@ -198,6 +219,58 @@
           {% else %}
             <p class="empty-state">No appointment requests yet.</p>
           {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Missed Lead Recovery</h2><p>Callers who showed intent but still need follow-up</p></div>
+        <div class="panel-body">
+          {% if missed_leads %}
+            <ul class="faq-list">
+              {% for item in missed_leads %}
+                <li>
+                  <div>
+                    <strong>{{ item.patient_name }}</strong>
+                    <span>{{ item.summary }}</span>
+                    <span class="muted-line">{{ item.caller_number }}</span>
+                  </div>
+                  <div class="record-meta">
+                    <span class="pill">{{ item.lead_score.title() }}</span>
+                    <a class="link-inline" href="/missed-leads">Recover lead</a>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No missed leads right now.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>FAQ Manager</h2><p>Edit the answers the receptionist can use for common clinic questions</p></div>
+        <div class="panel-body">
+          <form class="faq-create-form stack-form card-form">
+            <div class="split-grid">
+              <label><span>Question</span><input name="question" required placeholder="Do you offer root canal treatment?"></label>
+              <label><span>Answer</span><input name="answer" required placeholder="Yes, we offer consultations and same-week scheduling when available."></label>
+            </div>
+            <button type="submit" class="primary-button">Add FAQ</button>
+          </form>
+          <div class="stack-list top-gap">
+            {% for item in faqs %}
+              <form class="faq-edit-form stack-form card-form" data-faq-id="{{ item.id }}">
+                <div class="split-grid">
+                  <label><span>Question</span><input name="question" value="{{ item.question }}" required></label>
+                  <label><span>Answer</span><input name="answer" value="{{ item.answer }}" required></label>
+                </div>
+                <div class="row-actions">
+                  <button type="submit" class="secondary-button">Save FAQ</button>
+                  <button type="button" class="danger-button faq-delete" data-faq-id="{{ item.id }}">Delete</button>
+                </div>
+              </form>
+            {% endfor %}
+          </div>
         </div>
       </article>
 

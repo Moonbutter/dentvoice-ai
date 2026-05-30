@@ -13,7 +13,7 @@
   <main class="page-shell">
     <section class="hero compact-hero">
       <div><p class="eyebrow">Patient Profiles</p><h1>Track repeat patients and their recent history.</h1></div>
-      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/appointments">Appointments</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/missed-leads">Missed Leads</a><a class="secondary-button link-button" href="/appointments">Appointments</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
     </section>
     <section class="panel filter-panel">
       <div class="panel-body">
@@ -33,6 +33,7 @@
             <span class="muted-line">{{ item.appointment_count }} appointment(s)</span>
             <span class="muted-line">Latest visit: {{ item.latest_visit_date }}</span>
             {% if item.notes_preview %}<span class="muted-line">Note: {{ item.notes_preview }}</span>{% endif %}
+            <div class="top-gap-inline"><a class="link-inline" href="/patients/detail?phone={{ item.patient_query }}">Open patient detail</a></div>
           </div>
         </article>
       {% else %}

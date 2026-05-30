@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead CRM - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Demo Request CRM</p><h1>Manage inbound interest from clinics.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/missed-leads">Missed Leads</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/leads" class="filter-grid" data-save-filters="leads">
+          <label><span>Search lead</span><input name="q" value="{{ filters.q }}" placeholder="Name, clinic, phone, note"></label>
+          <label><span>Status</span><select name="status"><option value="">All</option>{% for item in contact_statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item.title() }}</option>{% endfor %}</select></label>
+          <div class="form-actions-row">
+            <button type="submit" class="primary-button">Apply</button>
+            <button type="button" class="secondary-button save-filter-button" data-save-filter-target="leads">Save Filter</button>
+            <button type="button" class="secondary-button clear-filter-button" data-clear-filter-target="leads">Clear Saved</button>
+          </div>
+        </form>
+        <div class="saved-filter-row" data-saved-filter-list="leads"></div>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      {% for item in contact_requests %}
+        <article class="panel">
+          <div class="panel-body">
+            <form class="contact-request-form stack-form card-form" data-request-id="{{ item.id }}">
+              <div class="task-card-top">
+                <div>
+                  <strong>{{ item.name }}</strong>
+                  <span>{{ item.clinic_name }}</span>
+                  <span class="muted-line">{{ item.phone_number }}</span>
+                </div>
+                <span class="pill">{{ item.status.title() }}</span>
+              </div>
+              <p class="message-paragraph">{{ item.message }}</p>
+              <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.title() }}</option>{% endfor %}</select></label>
+              <label><span>Owner notes</span><textarea name="owner_notes" rows="4" placeholder="Called clinic manager, waiting for trial slot, send brochure tomorrow">{{ item.owner_notes }}</textarea></label>
+              <button type="submit" class="primary-button">Update Lead</button>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No demo requests match these filters.</p></div></article>
+      {% endfor %}
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

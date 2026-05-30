@@ -243,7 +243,7 @@ button:hover,
 }
 
 .wide-stats {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
 .content-grid {
@@ -309,6 +309,18 @@ button:hover,
 .stack-form {
   display: grid;
   gap: 14px;
+}
+
+.stack-list {
+  display: grid;
+  gap: 14px;
+}
+
+.card-form {
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .filter-panel {
@@ -700,6 +712,13 @@ textarea {
   align-items: end;
 }
 
+.row-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -713,6 +732,16 @@ textarea {
 .empty-state {
   margin: 0;
   color: var(--muted);
+}
+
+.link-inline {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.link-inline:hover {
+  text-decoration: underline;
 }
 
 .toast {
@@ -739,69 +768,6 @@ textarea {
 .toast.visible {
   opacity: 1;
   transform: translateY(0);
-}
-
-.onboarding-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(31, 41, 55, 0.42);
-  backdrop-filter: blur(8px);
-}
-
-.onboarding-card {
-  width: min(620px, 100%);
-  padding: 26px;
-  border-radius: 28px;
-  background: rgba(255, 251, 247, 0.96);
-  box-shadow: var(--shadow);
-  display: grid;
-  gap: 14px;
-}
-
-.onboarding-card h2 {
-  margin: 0;
-}
-
-.onboarding-progress {
-  margin: 0;
-  color: var(--accent);
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.onboarding-step {
-  padding: 16px 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(255, 255, 255, 0.72);
-  opacity: 0.55;
-}
-
-.onboarding-step.is-active {
-  opacity: 1;
-  border-color: rgba(20, 108, 120, 0.24);
-  background: rgba(20, 108, 120, 0.08);
-  box-shadow: 0 14px 28px rgba(20, 108, 120, 0.08);
-}
-
-.onboarding-step strong,
-.onboarding-step span {
-  display: block;
-}
-
-.onboarding-step span {
-  margin-top: 6px;
-  color: var(--muted);
-}
-
-#back-onboarding:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
 }
 
 @media (max-width: 900px) {
@@ -832,7 +798,8 @@ textarea {
 
   .hero-actions,
   .form-actions-row,
-  .inline-form {
+  .inline-form,
+  .row-actions {
     justify-content: start;
     flex-direction: column;
     align-items: stretch;

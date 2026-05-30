@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Detail - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div>
+        <p class="eyebrow">Patient Detail</p>
+        <h1>{{ patient_detail.profile.patient_name }}</h1>
+        <p class="hero-copy">{{ patient_detail.profile.phone_number }} · {{ patient_detail.profile.appointment_count }} appointment(s) · {{ patient_detail.profile.open_tasks }} open task(s)</p>
+      </div>
+      <div class="hero-actions">
+        <a class="secondary-button link-button" href="/patients">Back to Patients</a>
+        <a class="secondary-button link-button" href="/appointments">Appointments</a>
+        <a class="secondary-button link-button" href="/calls">Calls</a>
+        <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card"><span class="stat-label">Latest Visit</span><strong class="stat-value">{{ patient_detail.profile.latest_visit_date }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Completed Visits</span><strong class="stat-value">{{ patient_detail.profile.completed_appointments }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Latest Status</span><strong class="stat-value">{{ patient_detail.profile.latest_status.replace("_", " ").title() }}</strong></article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Appointment History</h2><p>Every saved appointment for this patient</p></div>
+        <div class="panel-body">
+          <ul class="record-list">
+            {% for item in patient_detail.appointments %}
+              <li>
+                <div>
+                  <strong>{{ item.reason_for_visit }}</strong>
+                  <span>{{ item.preferred_date }} at {{ item.preferred_time }}</span>
+                  {% if item.notes %}<span class="muted-line">Note: {{ item.notes }}</span>{% endif %}
+                </div>
+                <div class="record-meta"><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Call History</h2><p>Recent voice interactions tied to this patient</p></div>
+        <div class="panel-body">
+          {% if patient_detail.calls %}
+            <ul class="faq-list">
+              {% for item in patient_detail.calls %}
+                <li>
+                  <div>
+                    <strong>{{ item.intent.replace("_", " ").title() }}</strong>
+                    <span>{{ item.summary }}</span>
+                  </div>
+                  <div class="record-meta">
+                    <span>{{ item.created_at[:10] }}</span>
+                    <span class="pill">{{ item.lead_score.title() }}</span>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No calls linked yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Follow-up Tasks</h2><p>Receptionist actions and callback notes</p></div>
+        <div class="panel-body">
+          {% if patient_detail.tasks %}
+            <ul class="faq-list">
+              {% for item in patient_detail.tasks %}
+                <li>
+                  <div>
+                    <strong>{{ item.note }}</strong>
+                    <span>Due {{ item.due_date }}</span>
+                  </div>
+                  <div class="record-meta"><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No follow-up tasks for this patient.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Related Demo Requests</h2><p>Landing-page leads using the same phone number</p></div>
+        <div class="panel-body">
+          {% if patient_detail.contacts %}
+            <ul class="faq-list">
+              {% for item in patient_detail.contacts %}
+                <li>
+                  <div>
+                    <strong>{{ item.clinic_name }}</strong>
+                    <span>{{ item.message }}</span>
+                    {% if item.owner_notes %}<span class="muted-line">CRM note: {{ item.owner_notes }}</span>{% endif %}
+                  </div>
+                  <div class="record-meta"><span class="pill">{{ item.status.title() }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No demo requests tied to this number.</p>
+          {% endif %}
+        </div>
+      </article>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

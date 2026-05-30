@@ -228,6 +228,59 @@ document.getElementById("contact-form")?.addEventListener("submit", async (event
   }
 });
 
+document.querySelectorAll(".contact-request-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/contact-requests/${form.dataset.requestId}/update`, formData);
+      refreshPage("Demo request updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".faq-create-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm("/api/faqs", formData);
+      refreshPage("FAQ added");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".faq-edit-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/faqs/${form.dataset.faqId}/update`, formData);
+      refreshPage("FAQ updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".faq-delete").forEach((button) => {
+  button.addEventListener("click", async () => {
+    if (!window.confirm("Delete this FAQ?")) {
+      return;
+    }
+    try {
+      await postForm(`/api/faqs/${button.dataset.faqId}/delete`, new FormData());
+      refreshPage("FAQ deleted");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
 document.getElementById("appointment-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -257,6 +310,19 @@ document.querySelectorAll(".task-edit-form").forEach((form) => {
       const formData = new FormData(form);
       await postForm(`/api/receptionist-tasks/${form.dataset.taskId}/update`, formData);
       refreshPage("Receptionist task updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".missed-lead-task-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/missed-leads/${form.dataset.callId}/task`, formData);
+      refreshPage("Recovery task created");
     } catch (error) {
       showToast(error.message, "error");
     }

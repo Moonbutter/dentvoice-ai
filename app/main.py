@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from os import getenv
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote_plus
 from uuid import uuid4
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
@@ -100,7 +101,7 @@ class ClinicSettingsInput(BaseModel):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "dentvoice.db"
-ASSET_VERSION = "20260530-4"
+ASSET_VERSION = "20260530-5"
 
 FAQS = [
     FAQAnswer(question="What are your clinic timings?", answer="We are open Monday to Saturday from 9 AM to 8 PM."),
@@ -114,6 +115,7 @@ CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "f
 LEAD_SCORES = ["hot", "warm", "cold"]
 TASK_STATUSES = ["open", "in_progress", "done"]
 APPOINTMENT_SOURCES = ["admin", "voice_call", "simulated_call", "api"]
+CONTACT_STATUSES = ["new", "contacted", "qualified", "closed"]
 
 call_sessions: dict[str, CallSession] = {}
 
@@ -210,6 +212,14 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS faq_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 action TEXT NOT NULL,
@@ -246,6 +256,10 @@ def init_db() -> None:
             db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_username TEXT NOT NULL DEFAULT 'admin'")
         if not column_exists(db, "clinic_settings", "admin_password"):
             db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_password TEXT NOT NULL DEFAULT 'dentvoice123'")
+        if not column_exists(db, "contact_requests", "status"):
+            db.execute("ALTER TABLE contact_requests ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
+        if not column_exists(db, "contact_requests", "owner_notes"):
+            db.execute("ALTER TABLE contact_requests ADD COLUMN owner_notes TEXT NOT NULL DEFAULT ''")
 
         existing_settings = db.execute("SELECT COUNT(*) AS count FROM clinic_settings").fetchone()["count"]
         if existing_settings == 0:
@@ -272,6 +286,15 @@ def init_db() -> None:
         if existing_slots == 0:
             for slot in default_slots():
                 db.execute("INSERT INTO slots (slot_date, slot_time) VALUES (?, ?)", (slot["date"], slot["time"]))
+
+        existing_faqs = db.execute("SELECT COUNT(*) AS count FROM faq_entries").fetchone()["count"]
+        if existing_faqs == 0:
+            created_at = datetime.now(UTC).isoformat()
+            for index, item in enumerate(FAQS):
+                db.execute(
+                    "INSERT INTO faq_entries (question, answer, sort_order, created_at) VALUES (?, ?, ?, ?)",
+                    (item.question, item.answer, index, created_at),
+                )
 
         db.commit()
 
@@ -418,13 +441,40 @@ def fetch_messages(limit: int = 20) -> list[WhatsAppMessage]:
         return [WhatsAppMessage(**dict(row)) for row in rows]
 
 
-def fetch_contact_requests(limit: int = 20) -> list[dict[str, str]]:
+def fetch_contact_requests(limit: int = 20, search: str = "", status: str = "") -> list[dict[str, str]]:
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if search:
+        pattern = f"%{search}%"
+        conditions.append("(name LIKE ? OR clinic_name LIKE ? OR phone_number LIKE ? OR message LIKE ? OR owner_notes LIKE ?)")
+        params.extend([pattern, pattern, pattern, pattern, pattern])
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    query = f"""
+        SELECT id, name, clinic_name, phone_number, message, status, owner_notes, created_at
+        FROM contact_requests
+        {where_clause}
+        ORDER BY datetime(created_at) DESC
+        LIMIT ?
+    """
+    params.append(limit)
+
+    with get_db() as db:
+        rows = db.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+
+def fetch_faq_entries(limit: int = 50) -> list[dict[str, object]]:
     with get_db() as db:
         rows = db.execute(
             """
-            SELECT id, name, clinic_name, phone_number, message, created_at
-            FROM contact_requests
-            ORDER BY datetime(created_at) DESC
+            SELECT id, question, answer, sort_order, created_at
+            FROM faq_entries
+            ORDER BY sort_order ASC, id ASC
             LIMIT ?
             """,
             (limit,),
@@ -489,6 +539,7 @@ def fetch_patient_profiles(limit: int = 200, search: str = "") -> list[dict[str,
         profile = {
             "patient_name": latest.patient_name,
             "phone_number": latest.phone_number,
+            "patient_query": quote_plus(latest.phone_number),
             "appointment_count": len(items),
             "latest_status": latest.status,
             "latest_visit_date": latest.preferred_date,
@@ -503,6 +554,64 @@ def fetch_patient_profiles(limit: int = 200, search: str = "") -> list[dict[str,
 
     profiles.sort(key=lambda item: str(item["latest_visit_date"]), reverse=True)
     return profiles[:limit]
+
+
+def fetch_patient_detail(phone_number: str) -> dict[str, object] | None:
+    appointments = [item for item in fetch_appointments(limit=1000) if item.phone_number == phone_number]
+    if not appointments:
+        return None
+
+    appointments.sort(key=lambda item: item.created_at, reverse=True)
+    patient_name = appointments[0].patient_name
+    calls = [item for item in fetch_call_records(limit=1000) if item.caller_number == phone_number or (item.patient_name and item.patient_name == patient_name)]
+    tasks = [item for item in fetch_receptionist_tasks(limit=1000) if item["phone_number"] == phone_number]
+    contacts = [item for item in fetch_contact_requests(limit=1000) if item["phone_number"] == phone_number]
+    latest = appointments[0]
+
+    return {
+        "profile": {
+            "patient_name": patient_name,
+            "phone_number": phone_number,
+            "appointment_count": len(appointments),
+            "latest_status": latest.status,
+            "latest_visit_date": latest.preferred_date,
+            "latest_reason": latest.reason_for_visit,
+            "notes_preview": latest.notes,
+            "completed_appointments": sum(1 for item in appointments if item.status == "completed"),
+            "open_tasks": sum(1 for item in tasks if item["status"] != "done"),
+        },
+        "appointments": appointments,
+        "calls": calls,
+        "tasks": tasks,
+        "contacts": contacts,
+        "patient_query": quote_plus(phone_number),
+    }
+
+
+def fetch_missed_leads(limit: int = 100, search: str = "", lead_score: str = "") -> list[dict[str, object]]:
+    records = []
+    for item in fetch_call_records(limit=1000, search=search, lead_score=lead_score):
+        if item.appointment_request is not None:
+            continue
+        if item.intent not in {"appointment_booking", "reschedule", "pricing", "general", "faq", "directions"}:
+            continue
+
+        records.append(
+            {
+                "id": item.id,
+                "caller_number": item.caller_number,
+                "patient_name": item.patient_name or "Unknown caller",
+                "intent": item.intent,
+                "summary": item.summary,
+                "urgent": item.urgent,
+                "lead_score": item.lead_score,
+                "created_at": item.created_at,
+                "recommended_note": f"Follow up on {item.intent.replace('_', ' ')} inquiry and offer the next available appointment slot.",
+            }
+        )
+
+    records.sort(key=lambda item: item["created_at"], reverse=True)
+    return records[:limit]
 
 
 def fetch_calendar_entries() -> list[dict[str, object]]:
@@ -534,6 +643,7 @@ def fetch_analytics() -> dict[str, object]:
     calls_by_intent = Counter(item.intent for item in calls)
     calls_by_lead_score = Counter(item.lead_score for item in calls)
     tasks_by_status = Counter(item["status"] for item in tasks)
+    contacts_by_status = Counter(item["status"] for item in contacts)
 
     recent_days: list[dict[str, object]] = []
     today = datetime.now(UTC).date()
@@ -558,12 +668,14 @@ def fetch_analytics() -> dict[str, object]:
             "contacts": len(contacts),
             "patients": len(fetch_patient_profiles(limit=1000)),
             "open_tasks": sum(1 for item in tasks if item["status"] != "done"),
+            "missed_leads": len(fetch_missed_leads(limit=1000)),
         },
         "appointments_by_status": dict(appointments_by_status),
         "appointments_by_source": dict(appointments_by_source),
         "calls_by_intent": dict(calls_by_intent),
         "calls_by_lead_score": dict(calls_by_lead_score),
         "tasks_by_status": dict(tasks_by_status),
+        "contacts_by_status": dict(contacts_by_status),
         "recent_days": recent_days,
         "conversion_rate": round((len(appointments) / len(calls)) * 100, 1) if calls else 0.0,
         "completion_rate": round((appointments_by_status.get("completed", 0) / len(appointments)) * 100, 1) if appointments else 0.0,
@@ -893,11 +1005,12 @@ def build_dashboard_context() -> dict[str, object]:
         "call_records": fetch_call_records(limit=10),
         "messages": fetch_messages(limit=10),
         "contact_requests": fetch_contact_requests(limit=5),
+        "missed_leads": fetch_missed_leads(limit=5),
         "audit_logs": fetch_audit_logs(limit=8),
         "receptionist_tasks": fetch_receptionist_tasks(limit=8),
         "calendar_entries": fetch_calendar_entries()[:5],
         "patient_profiles": fetch_patient_profiles(limit=5),
-        "faqs": FAQS,
+        "faqs": fetch_faq_entries(limit=8),
         "slots": fetch_slots(),
         "settings": settings,
         "branding": branding,
@@ -908,11 +1021,13 @@ def build_dashboard_context() -> dict[str, object]:
             "calls_by_intent": build_chart(analytics["calls_by_intent"], CALL_INTENTS),
             "calls_by_lead_score": build_chart(analytics["calls_by_lead_score"], LEAD_SCORES),
             "tasks_by_status": build_chart(analytics["tasks_by_status"], TASK_STATUSES),
+            "contacts_by_status": build_chart(analytics["contacts_by_status"], CONTACT_STATUSES),
             "recent_days": build_trend_chart(analytics["recent_days"]),
         },
         "statuses": APPOINTMENT_STATUSES,
         "lead_scores": LEAD_SCORES,
         "task_statuses": TASK_STATUSES,
+        "contact_statuses": CONTACT_STATUSES,
         "default_admin_username": settings.get("admin_username", "admin"),
         "asset_version": ASSET_VERSION,
     }
@@ -1066,6 +1181,61 @@ async def patients_page(request: Request, q: str = Query(default="")) -> HTMLRes
     return templates.TemplateResponse(request, "patients.html", context)
 
 
+@app.get("/patients/detail", response_class=HTMLResponse)
+async def patient_detail_page(request: Request, phone: str = Query(...)) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    detail = fetch_patient_detail(phone)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    context = build_dashboard_context()
+    context.update({"page_title": "Patient Detail", "patient_detail": detail, "is_authenticated": True})
+    return templates.TemplateResponse(request, "patient_detail.html", context)
+
+
+@app.get("/leads", response_class=HTMLResponse)
+async def leads_page(
+    request: Request,
+    q: str = Query(default=""),
+    status: str = Query(default=""),
+) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Demo Request CRM",
+            "contact_requests": fetch_contact_requests(limit=200, search=q, status=status),
+            "filters": {"q": q, "status": status},
+            "is_authenticated": True,
+        }
+    )
+    return templates.TemplateResponse(request, "leads.html", context)
+
+
+@app.get("/missed-leads", response_class=HTMLResponse)
+async def missed_leads_page(
+    request: Request,
+    q: str = Query(default=""),
+    lead_score: str = Query(default=""),
+) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Missed Lead Recovery",
+            "missed_leads": fetch_missed_leads(limit=200, search=q, lead_score=lead_score),
+            "filters": {"q": q, "lead_score": lead_score},
+            "is_authenticated": True,
+        }
+    )
+    return templates.TemplateResponse(request, "missed_leads.html", context)
+
+
 @app.get("/audit", response_class=HTMLResponse)
 async def audit_page(request: Request) -> HTMLResponse:
     redirect_response = require_authenticated_page(request)
@@ -1123,6 +1293,88 @@ async def create_contact_request(
         db.commit()
     log_audit("create", "contact_request", request_id, f"New demo request from {name} at {clinic_name}.")
     return JSONResponse({"message": "Demo request submitted"})
+
+
+@app.post("/api/contact-requests/{request_id}/update")
+async def update_contact_request(
+    request: Request,
+    request_id: str,
+    status: str = Form(...),
+    owner_notes: str = Form(default=""),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        result = db.execute(
+            """
+            UPDATE contact_requests
+            SET status = ?, owner_notes = ?
+            WHERE id = ?
+            """,
+            (status, owner_notes, request_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Contact request not found")
+    log_audit("update", "contact_request", request_id, f"Updated demo request status to {status}.")
+    return JSONResponse({"message": "Demo request updated"})
+
+
+@app.post("/api/faqs")
+async def create_faq(
+    request: Request,
+    question: str = Form(...),
+    answer: str = Form(...),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        max_order = db.execute("SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM faq_entries").fetchone()["max_order"]
+        cursor = db.execute(
+            """
+            INSERT INTO faq_entries (question, answer, sort_order, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (question, answer, int(max_order) + 1, datetime.now(UTC).isoformat()),
+        )
+        faq_id = str(cursor.lastrowid)
+        db.commit()
+    log_audit("create", "faq_entry", faq_id, f"Added FAQ: {question}")
+    return JSONResponse({"message": "FAQ added"})
+
+
+@app.post("/api/faqs/{faq_id}/update")
+async def update_faq(
+    request: Request,
+    faq_id: int,
+    question: str = Form(...),
+    answer: str = Form(...),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        result = db.execute(
+            """
+            UPDATE faq_entries
+            SET question = ?, answer = ?
+            WHERE id = ?
+            """,
+            (question, answer, faq_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="FAQ not found")
+    log_audit("update", "faq_entry", str(faq_id), f"Updated FAQ: {question}")
+    return JSONResponse({"message": "FAQ updated"})
+
+
+@app.post("/api/faqs/{faq_id}/delete")
+async def delete_faq(request: Request, faq_id: int) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        result = db.execute("DELETE FROM faq_entries WHERE id = ?", (faq_id,))
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="FAQ not found")
+    log_audit("delete", "faq_entry", str(faq_id), "Deleted FAQ entry.")
+    return JSONResponse({"message": "FAQ deleted"})
 
 
 @app.post("/api/simulate-call")
@@ -1346,6 +1598,33 @@ async def create_receptionist_task(
         db.commit()
     log_audit("create", "receptionist_task", task_id, f"Created follow-up task for {patient_name}.")
     return JSONResponse({"message": "Receptionist task created"})
+
+
+@app.post("/api/missed-leads/{call_id}/task")
+async def create_missed_lead_task(
+    request: Request,
+    call_id: str,
+    patient_name: str = Form(...),
+    phone_number: str = Form(...),
+    note: str = Form(...),
+    due_date: str = Form(...),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    task_id = str(uuid4())
+    with get_db() as db:
+        row = db.execute("SELECT id FROM call_records WHERE id = ?", (call_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Call not found")
+        db.execute(
+            """
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (task_id, patient_name, phone_number, note, due_date, "open", None, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    log_audit("create", "receptionist_task", task_id, f"Created missed-lead recovery task for {patient_name}.")
+    return JSONResponse({"message": "Recovery task created"})
 
 
 @app.post("/api/receptionist-tasks/{task_id}/update")
