@@ -27,16 +27,47 @@ async function postForm(url, formData) {
   return response.json();
 }
 
-function refreshPage() {
+function showToast(message, kind = "success") {
+  const toast = document.getElementById("toast");
+  if (!toast) {
+    return;
+  }
+
+  toast.textContent = message;
+  toast.dataset.kind = kind;
+  toast.hidden = false;
+  requestAnimationFrame(() => {
+    toast.classList.add("visible");
+  });
+
+  window.clearTimeout(showToast._timeoutId);
+  showToast._timeoutId = window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 220);
+  }, 2600);
+}
+
+function refreshPage(message) {
+  if (message) {
+    window.sessionStorage.setItem("dentvoice_toast", message);
+  }
   window.location.reload();
+}
+
+const pendingToast = window.sessionStorage.getItem("dentvoice_toast");
+if (pendingToast) {
+  showToast(pendingToast);
+  window.sessionStorage.removeItem("dentvoice_toast");
 }
 
 document.getElementById("seed-demo")?.addEventListener("click", async () => {
   try {
     await postJson("/api/demo/seed", {});
-    refreshPage();
+    refreshPage("Demo data loaded");
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
   }
 });
 
@@ -53,9 +84,21 @@ document.getElementById("simulate-call")?.addEventListener("click", async () => 
       preferred_time: fallbackSlot?.time,
       reason_for_visit: "Teeth cleaning",
     });
-    refreshPage();
+    refreshPage("Simulated call added");
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("contact-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/contact-request", formData);
+    event.currentTarget.reset();
+    showToast("Demo request submitted");
+  } catch (error) {
+    showToast(error.message, "error");
   }
 });
 
@@ -64,9 +107,9 @@ document.getElementById("appointment-form")?.addEventListener("submit", async (e
   try {
     const formData = new FormData(event.currentTarget);
     await postForm("/api/admin/appointments", formData);
-    refreshPage();
+    refreshPage("Appointment saved");
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
   }
 });
 
@@ -79,9 +122,9 @@ document.getElementById("settings-form")?.addEventListener("submit", async (even
       clinic_timings: form.clinic_timings.value,
       clinic_address: form.clinic_address.value,
     });
-    refreshPage();
+    refreshPage("Clinic settings updated");
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
   }
 });
 
@@ -93,9 +136,9 @@ document.getElementById("slot-form")?.addEventListener("submit", async (event) =
       date: form.date.value,
       time: form.time.value,
     });
-    refreshPage();
+    refreshPage("Slot added");
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
   }
 });
 
@@ -103,9 +146,9 @@ document.querySelectorAll(".slot-delete").forEach((button) => {
   button.addEventListener("click", async () => {
     try {
       await postForm(`/api/slots/${button.dataset.slotId}/delete`, new FormData());
-      refreshPage();
+      refreshPage("Slot removed");
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, "error");
     }
   });
 });
@@ -116,9 +159,9 @@ document.querySelectorAll(".appointment-edit-form").forEach((form) => {
     try {
       const formData = new FormData(form);
       await postForm(`/api/appointments/${form.dataset.appointmentId}/update`, formData);
-      refreshPage();
+      refreshPage("Appointment updated");
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, "error");
     }
   });
 });
@@ -130,9 +173,9 @@ document.querySelectorAll(".appointment-delete").forEach((button) => {
     }
     try {
       await postForm(`/api/appointments/${button.dataset.appointmentId}/delete`, new FormData());
-      refreshPage();
+      refreshPage("Appointment deleted");
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, "error");
     }
   });
 });
@@ -143,9 +186,9 @@ document.querySelectorAll(".call-score-form").forEach((form) => {
     try {
       const formData = new FormData(form);
       await postForm(`/api/calls/${form.dataset.callId}/lead-score`, formData);
-      refreshPage();
+      refreshPage("Lead score updated");
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, "error");
     }
   });
 });

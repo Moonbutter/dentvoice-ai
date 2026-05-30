@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Log - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Audit Log</p><h1>Review product activity and operational changes.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/docs">Docs</a></div>
+    </section>
+    <section class="content-grid single-column">
+      <article class="panel">
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in audit_logs %}
+              <li>
+                <div><strong>{{ item.action.title() }} {{ item.entity_type.replace("_", " ").title() }}</strong><span>{{ item.summary }}</span></div>
+                <div class="record-meta"><span>{{ item.created_at[:10] }}</span>{% if item.entity_id %}<span>{{ item.entity_id }}</span>{% endif %}</div>
+              </li>
+            {% else %}
+              <li><p class="empty-state">No audit log entries yet.</p></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

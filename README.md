@@ -18,6 +18,12 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Appointment notes, edit, and delete workflows
 - Lead scoring for call prioritization
 - Free analytics and docs pages
+- Calendar view for appointments
+- Patient profile summaries
+- Contact/demo request form
+- Audit log for product activity
+- Double-booking protection
+- In-app toast notifications
 
 ## Project Structure
 
@@ -54,12 +60,16 @@ uvicorn app.main:app --reload
 - `GET /appointments` - Appointment management page
 - `GET /calls` - Call management page
 - `GET /analytics` - Analytics page
+- `GET /calendar` - Calendar-style appointment view
+- `GET /patients` - Patient profiles and history
+- `GET /audit` - Audit log
 - `GET /docs` - Product/docs page
 - `GET /health` - Health check for deployment
 - `GET /api/dashboard` - JSON dashboard data
 - `GET /api/available-slots` - Available booking slots
 - `GET /api/export/appointments.csv` - Export appointments
 - `GET /api/export/calls.csv` - Export calls
+- `POST /api/contact-request` - Save landing-page demo request
 - `POST /api/simulate-call` - Simulate an inbound patient call
 - `POST /api/appointments` - Create an appointment request
 - `POST /api/admin/appointments` - Create appointment from dashboard

@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">AI Receptionist for Dental Clinics</p>
         <h1>{{ settings.clinic_name }}</h1>
-        <p class="hero-copy">Your live admin workspace for appointments, calls, lead scoring, slot management, clinic settings, exports, and follow-up notes.</p>
+        <p class="hero-copy">Your live admin workspace for appointments, calls, lead scoring, slot management, clinic settings, exports, follow-up notes, demo requests, and audit history.</p>
         <div class="hero-meta">
           <span>{{ settings.clinic_timings }}</span>
           <span>{{ settings.clinic_address }}</span>
@@ -26,35 +26,25 @@
         <a class="secondary-button link-button" href="/appointments">Appointments</a>
         <a class="secondary-button link-button" href="/calls">Calls</a>
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
+        <a class="secondary-button link-button" href="/calendar">Calendar</a>
+        <a class="secondary-button link-button" href="/patients">Patients</a>
+        <a class="secondary-button link-button" href="/audit">Audit</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
       </div>
     </section>
 
-    <section class="stats-grid">
-      <article class="stat-card">
-        <span class="stat-label">Appointments</span>
-        <strong class="stat-value">{{ stats.appointments }}</strong>
-      </article>
-      <article class="stat-card">
-        <span class="stat-label">Calls Logged</span>
-        <strong class="stat-value">{{ stats.calls }}</strong>
-      </article>
-      <article class="stat-card alert">
-        <span class="stat-label">Emergencies</span>
-        <strong class="stat-value">{{ stats.emergencies }}</strong>
-      </article>
-      <article class="stat-card">
-        <span class="stat-label">WhatsApp Messages</span>
-        <strong class="stat-value">{{ stats.messages }}</strong>
-      </article>
+    <section class="stats-grid wide-stats">
+      <article class="stat-card"><span class="stat-label">Appointments</span><strong class="stat-value">{{ stats.appointments }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Calls Logged</span><strong class="stat-value">{{ stats.calls }}</strong></article>
+      <article class="stat-card alert"><span class="stat-label">Emergencies</span><strong class="stat-value">{{ stats.emergencies }}</strong></article>
+      <article class="stat-card"><span class="stat-label">WhatsApp Messages</span><strong class="stat-value">{{ stats.messages }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Patient Profiles</span><strong class="stat-value">{{ stats.patients }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Demo Requests</span><strong class="stat-value">{{ stats.contacts }}</strong></article>
     </section>
 
     <section class="content-grid">
       <article class="panel">
-        <div class="panel-header">
-          <h2>Admin Booking</h2>
-          <p>Create appointments manually from the dashboard</p>
-        </div>
+        <div class="panel-header"><h2>Admin Booking</h2><p>Create appointments manually from the dashboard</p></div>
         <div class="panel-body">
           <form id="appointment-form" class="stack-form">
             <label><span>Patient name</span><input name="patient_name" required></label>
@@ -65,24 +55,14 @@
             </div>
             <label><span>Reason for visit</span><input name="reason_for_visit" required></label>
             <label><span>Notes</span><textarea name="notes" rows="3" placeholder="Optional follow-up note"></textarea></label>
-            <label>
-              <span>Status</span>
-              <select name="status">
-                {% for status in statuses %}
-                  <option value="{{ status }}">{{ status.replace("_", " ").title() }}</option>
-                {% endfor %}
-              </select>
-            </label>
+            <label><span>Status</span><select name="status">{% for status in statuses %}<option value="{{ status }}">{{ status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
             <button type="submit" class="primary-button">Save Appointment</button>
           </form>
         </div>
       </article>
 
       <article class="panel">
-        <div class="panel-header">
-          <h2>Clinic Settings</h2>
-          <p>Edit the business details used across the dashboard and call flow</p>
-        </div>
+        <div class="panel-header"><h2>Clinic Settings</h2><p>Edit the business details used across the dashboard and call flow</p></div>
         <div class="panel-body">
           <form id="settings-form" class="stack-form">
             <label><span>Clinic name</span><input name="clinic_name" value="{{ settings.clinic_name }}" required></label>
@@ -94,17 +74,11 @@
       </article>
 
       <article class="panel">
-        <div class="panel-header">
-          <h2>Analytics Snapshot</h2>
-          <p>Quick business health from the last saved activity</p>
-        </div>
+        <div class="panel-header"><h2>Analytics Snapshot</h2><p>Quick business health from the latest saved activity</p></div>
         <div class="panel-body">
           <div class="mini-metrics">
             {% for key, value in analytics.appointments_by_status.items() %}
-              <div class="mini-metric">
-                <strong>{{ value }}</strong>
-                <span>{{ key.replace("_", " ").title() }}</span>
-              </div>
+              <div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.replace("_", " ").title() }}</span></div>
             {% endfor %}
           </div>
           <a class="secondary-button link-button top-gap-inline" href="/analytics">Open Full Analytics</a>
@@ -112,24 +86,55 @@
       </article>
 
       <article class="panel">
-        <div class="panel-header">
-          <h2>Free Feature Pack</h2>
-          <p>The product now includes multiple no-cost operational upgrades</p>
-        </div>
+        <div class="panel-header"><h2>Free Feature Pack</h2><p>Major product features added without paid APIs</p></div>
         <div class="panel-body">
           <ul class="faq-list">
-            <li><strong>Persistent SQLite storage</strong><span>Appointments, calls, slots, and settings survive restarts.</span></li>
+            <li><strong>Persistent SQLite storage</strong><span>Appointments, calls, slots, requests, and settings survive restarts.</span></li>
             <li><strong>Lead scoring</strong><span>Calls can be marked hot, warm, or cold based on urgency and booking likelihood.</span></li>
-            <li><strong>Search and filtering</strong><span>Dedicated pages let you review appointments and call records faster.</span></li>
+            <li><strong>Search, filters, and profiles</strong><span>Dedicated pages help staff review appointments, patients, and call activity faster.</span></li>
+            <li><strong>Double-booking protection</strong><span>Conflicting appointment slots are blocked automatically.</span></li>
           </ul>
         </div>
       </article>
 
-      <article class="panel panel-span-two">
-        <div class="panel-header">
-          <h2>Recent Appointments</h2>
-          <p>Use the full page for filtering, notes, edit, and delete</p>
+      <article class="panel">
+        <div class="panel-header"><h2>Recent Demo Requests</h2><p>Leads captured from the public landing page</p></div>
+        <div class="panel-body">
+          {% if contact_requests %}
+            <ul class="faq-list">
+              {% for item in contact_requests %}
+                <li>
+                  <div><strong>{{ item.name }} - {{ item.clinic_name }}</strong><span>{{ item.message }}</span></div>
+                  <div class="record-meta"><span>{{ item.phone_number }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No demo requests yet.</p>
+          {% endif %}
         </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Patient Snapshot</h2><p>Recent patient profiles built from appointment history</p></div>
+        <div class="panel-body">
+          {% if patient_profiles %}
+            <ul class="faq-list">
+              {% for item in patient_profiles %}
+                <li>
+                  <div><strong>{{ item.patient_name }}</strong><span>{{ item.latest_reason }}</span></div>
+                  <div class="record-meta"><span>{{ item.appointment_count }} visits</span><span>{{ item.latest_visit_date }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No patient history yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Recent Appointments</h2><p>Use the full page for filtering, notes, edit, and delete</p></div>
         <div class="panel-body">
           {% if appointments %}
             <ul class="record-list">
@@ -156,10 +161,7 @@
       </article>
 
       <article class="panel">
-        <div class="panel-header">
-          <h2>Recent Calls</h2>
-          <p>Latest voice activity with lead prioritization</p>
-        </div>
+        <div class="panel-header"><h2>Recent Calls</h2><p>Latest voice activity with lead prioritization</p></div>
         <div class="panel-body">
           {% if call_records %}
             <ul class="record-list">
@@ -184,10 +186,7 @@
       </article>
 
       <article class="panel">
-        <div class="panel-header">
-          <h2>Slot Management</h2>
-          <p>Add or remove live booking slots offered during calls</p>
-        </div>
+        <div class="panel-header"><h2>Slot Management</h2><p>Add or remove live booking slots offered during calls</p></div>
         <div class="panel-body">
           <form id="slot-form" class="stack-form compact-form">
             <div class="split-grid">
@@ -199,17 +198,49 @@
           <ul class="faq-list top-gap">
             {% for item in slots %}
               <li>
-                <div>
-                  <strong>Option {{ item.option }}</strong>
-                  <span>{{ item.date }} at {{ item.time }}</span>
-                </div>
+                <div><strong>Option {{ item.option }}</strong><span>{{ item.date }} at {{ item.time }}</span></div>
                 <button class="danger-button slot-delete" data-slot-id="{{ item.id }}">Delete</button>
               </li>
             {% endfor %}
           </ul>
         </div>
       </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Upcoming Calendar</h2><p>Next few scheduled days at a glance</p></div>
+        <div class="panel-body">
+          {% if calendar_entries %}
+            <ul class="faq-list">
+              {% for item in calendar_entries %}
+                <li><strong>{{ item.date }}</strong><span>{{ item.count }} appointment(s)</span></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No scheduled days yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Audit Log</h2><p>Recent tracked changes across the product</p></div>
+        <div class="panel-body">
+          {% if audit_logs %}
+            <ul class="faq-list">
+              {% for item in audit_logs %}
+                <li>
+                  <div><strong>{{ item.action.title() }} {{ item.entity_type.replace("_", " ").title() }}</strong><span>{{ item.summary }}</span></div>
+                  <div class="record-meta"><span>{{ item.created_at[:10] }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="empty-state">No audit activity yet.</p>
+          {% endif %}
+        </div>
+      </article>
     </section>
+
+    <div id="toast" class="toast" hidden></div>
   </main>
 
   <script src="/static/app.js"></script>

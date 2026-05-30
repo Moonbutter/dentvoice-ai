@@ -18,12 +18,15 @@
         <p class="hero-copy">A 24/7 AI receptionist built for Indian dental clinics. It handles inbound calls, supports appointment booking, flags urgent cases, and gives your team a live operating dashboard.</p>
         <div class="hero-actions">
           <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+          <a class="secondary-button link-button" href="/calendar">View Calendar</a>
+          <a class="secondary-button link-button" href="/patients">Patient Profiles</a>
           <a class="secondary-button link-button" href="https://github.com/Moonbutter/dentvoice-ai">View GitHub</a>
         </div>
         <div class="hero-meta">
           <span>{{ stats.appointments }} saved appointments</span>
           <span>{{ stats.calls }} call records</span>
           <span>{{ stats.emergencies }} emergency flags</span>
+          <span>{{ stats.contacts }} demo requests</span>
         </div>
       </div>
       <div class="landing-card">
@@ -34,6 +37,7 @@
           <li>Editable clinic settings and booking slots</li>
           <li>CSV export for operations tracking</li>
           <li>Twilio-compatible voice webhook flow</li>
+          <li>Calendar, patient profiles, analytics, and audit logs</li>
         </ul>
       </div>
     </section>
@@ -46,18 +50,9 @@
         </div>
         <div class="panel-body">
           <ul class="faq-list">
-            <li>
-              <strong>Appointment capture</strong>
-              <span>Patients can move through a booking flow and get structured follow-up.</span>
-            </li>
-            <li>
-              <strong>Urgent case routing</strong>
-              <span>Emergency-style calls are highlighted for fast human review.</span>
-            </li>
-            <li>
-              <strong>Clinic operations view</strong>
-              <span>The dashboard tracks appointments, calls, messages, and slot availability.</span>
-            </li>
+            <li><strong>Appointment capture</strong><span>Patients can move through a booking flow and get structured follow-up.</span></li>
+            <li><strong>Urgent case routing</strong><span>Emergency-style calls are highlighted for fast human review.</span></li>
+            <li><strong>Clinic operations view</strong><span>The dashboard tracks appointments, calls, messages, slot availability, and demo requests.</span></li>
           </ul>
         </div>
       </article>
@@ -69,18 +64,10 @@
         </div>
         <div class="panel-body">
           <ul class="faq-list">
-            <li>
-              <strong>Dashboard</strong>
-              <span><a href="/dashboard">/dashboard</a></span>
-            </li>
-            <li>
-              <strong>Health check</strong>
-              <span><a href="/health">/health</a></span>
-            </li>
-            <li>
-              <strong>GitHub repository</strong>
-              <span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span>
-            </li>
+            <li><strong>Dashboard</strong><span><a href="/dashboard">/dashboard</a></span></li>
+            <li><strong>Health check</strong><span><a href="/health">/health</a></span></li>
+            <li><strong>GitHub repository</strong><span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span></li>
+            <li><strong>Product docs</strong><span><a href="/docs">/docs</a></span></li>
           </ul>
         </div>
       </article>
@@ -93,10 +80,7 @@
         <div class="panel-body">
           <ul class="faq-list">
             {% for item in faqs %}
-              <li>
-                <strong>{{ item.question }}</strong>
-                <span>{{ item.answer }}</span>
-              </li>
+              <li><strong>{{ item.question }}</strong><span>{{ item.answer }}</span></li>
             {% endfor %}
           </ul>
         </div>
@@ -110,15 +94,35 @@
         <div class="panel-body">
           <ul class="faq-list">
             {% for item in slots %}
-              <li>
-                <strong>Option {{ item.option }}</strong>
-                <span>{{ item.date }} at {{ item.time }}</span>
-              </li>
+              <li><strong>Option {{ item.option }}</strong><span>{{ item.date }} at {{ item.time }}</span></li>
             {% endfor %}
           </ul>
         </div>
       </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header">
+          <h2>Book a Demo / Contact the Builder</h2>
+          <p>Free inbound lead capture for clinics interested in the product</p>
+        </div>
+        <div class="panel-body">
+          <form id="contact-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Your name</span><input name="name" required></label>
+              <label><span>Clinic name</span><input name="clinic_name" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Phone number</span><input name="phone_number" required></label>
+              <label><span>What do you want to automate?</span><input name="message" placeholder="Appointments, after-hours calls, reminders..." required></label>
+            </div>
+            <button type="submit" class="primary-button">Submit Demo Request</button>
+          </form>
+        </div>
+      </article>
     </section>
+
+    <div id="toast" class="toast" hidden></div>
   </main>
+  <script src="/static/app.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -189,6 +189,24 @@ def init_db() -> None:
                 slot_date TEXT NOT NULL,
                 slot_time TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS contact_requests (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                clinic_name TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT,
+                summary TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             """
         )
 
@@ -247,15 +265,7 @@ def fetch_slots() -> list[dict[str, str]]:
             ORDER BY slot_date ASC, slot_time ASC
             """
         ).fetchall()
-        return [
-            {
-                "id": row["id"],
-                "option": str(index + 1),
-                "date": row["slot_date"],
-                "time": row["slot_time"],
-            }
-            for index, row in enumerate(rows)
-        ]
+        return [{"id": row["id"], "option": str(index + 1), "date": row["slot_date"], "time": row["slot_time"]} for index, row in enumerate(rows)]
 
 
 def fetch_appointments(
@@ -270,9 +280,9 @@ def fetch_appointments(
     params: list[object] = []
 
     if search:
-        conditions.append("(patient_name LIKE ? OR phone_number LIKE ? OR reason_for_visit LIKE ?)")
+        conditions.append("(patient_name LIKE ? OR phone_number LIKE ? OR reason_for_visit LIKE ? OR notes LIKE ?)")
         pattern = f"%{search}%"
-        params.extend([pattern, pattern, pattern])
+        params.extend([pattern, pattern, pattern, pattern])
     if status:
         conditions.append("status = ?")
         params.append(status)
@@ -359,10 +369,86 @@ def fetch_messages(limit: int = 20) -> list[WhatsAppMessage]:
         return [WhatsAppMessage(**dict(row)) for row in rows]
 
 
+def fetch_contact_requests(limit: int = 20) -> list[dict[str, str]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, name, clinic_name, phone_number, message, created_at
+            FROM contact_requests
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def fetch_audit_logs(limit: int = 50) -> list[dict[str, str]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, action, entity_type, entity_id, summary, created_at
+            FROM audit_logs
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def fetch_patient_profiles(limit: int = 200, search: str = "") -> list[dict[str, object]]:
+    appointments = fetch_appointments(limit=1000)
+    grouped: dict[str, list[AppointmentRequest]] = defaultdict(list)
+    for item in appointments:
+        key = item.phone_number or item.patient_name
+        grouped[key].append(item)
+
+    profiles: list[dict[str, object]] = []
+    for items in grouped.values():
+        latest = max(items, key=lambda item: item.created_at)
+        notes = [item.notes for item in items if item.notes]
+        profile = {
+            "patient_name": latest.patient_name,
+            "phone_number": latest.phone_number,
+            "appointment_count": len(items),
+            "latest_status": latest.status,
+            "latest_visit_date": latest.preferred_date,
+            "latest_reason": latest.reason_for_visit,
+            "notes_preview": notes[-1] if notes else "",
+        }
+        if search:
+            haystack = f"{profile['patient_name']} {profile['phone_number']} {profile['latest_reason']} {profile['notes_preview']}".lower()
+            if search.lower() not in haystack:
+                continue
+        profiles.append(profile)
+
+    profiles.sort(key=lambda item: str(item["latest_visit_date"]), reverse=True)
+    return profiles[:limit]
+
+
+def fetch_calendar_entries() -> list[dict[str, object]]:
+    grouped: dict[str, list[AppointmentRequest]] = defaultdict(list)
+    for item in fetch_appointments(limit=1000):
+        grouped[item.preferred_date].append(item)
+
+    calendar_rows = []
+    for day, entries in sorted(grouped.items()):
+        calendar_rows.append(
+            {
+                "date": day,
+                "appointments": sorted(entries, key=lambda item: item.preferred_time),
+                "count": len(entries),
+            }
+        )
+    return calendar_rows
+
+
 def fetch_analytics() -> dict[str, object]:
     appointments = fetch_appointments(limit=1000)
     calls = fetch_call_records(limit=1000)
     messages = fetch_messages(limit=1000)
+    contacts = fetch_contact_requests(limit=1000)
 
     appointments_by_status = Counter(item.status for item in appointments)
     appointments_by_source = Counter(item.source for item in appointments)
@@ -379,6 +465,7 @@ def fetch_analytics() -> dict[str, object]:
                 "date": iso_day,
                 "appointments": sum(1 for item in appointments if item.created_at[:10] == iso_day),
                 "calls": sum(1 for item in calls if item.created_at[:10] == iso_day),
+                "contacts": sum(1 for item in contacts if item["created_at"][:10] == iso_day),
             }
         )
 
@@ -388,6 +475,8 @@ def fetch_analytics() -> dict[str, object]:
             "calls": len(calls),
             "messages": len(messages),
             "emergencies": sum(1 for item in calls if item.urgent),
+            "contacts": len(contacts),
+            "patients": len(fetch_patient_profiles(limit=1000)),
         },
         "appointments_by_status": dict(appointments_by_status),
         "appointments_by_source": dict(appointments_by_source),
@@ -395,6 +484,34 @@ def fetch_analytics() -> dict[str, object]:
         "calls_by_lead_score": dict(calls_by_lead_score),
         "recent_days": recent_days,
     }
+
+
+def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str) -> None:
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO audit_logs (action, entity_type, entity_id, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (action, entity_type, entity_id, summary, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+
+
+def check_double_booking(preferred_date: str, preferred_time: str, *, exclude_appointment_id: str | None = None) -> None:
+    with get_db() as db:
+        query = """
+            SELECT id
+            FROM appointments
+            WHERE preferred_date = ? AND preferred_time = ? AND status != 'cancelled'
+        """
+        params: list[object] = [preferred_date, preferred_time]
+        if exclude_appointment_id:
+            query += " AND id != ?"
+            params.append(exclude_appointment_id)
+        conflict = db.execute(query, params).fetchone()
+        if conflict:
+            raise HTTPException(status_code=409, detail="This appointment slot is already booked.")
 
 
 def escape_xml(value: str) -> str:
@@ -517,6 +634,7 @@ def create_appointment_record(
     status: Literal["new", "confirmed", "completed", "cancelled", "needs_follow_up"] = "confirmed",
     notes: str = "",
 ) -> AppointmentRequest:
+    check_double_booking(preferred_date, preferred_time)
     appointment = AppointmentRequest(
         patient_name=patient_name,
         phone_number=phone_number,
@@ -549,6 +667,7 @@ def create_appointment_record(
         )
         db.commit()
     send_whatsapp_confirmation(phone_number, patient_name, f"appointment booked for {preferred_date} at {preferred_time}")
+    log_audit("create", "appointment", appointment.id, f"Created appointment for {patient_name} on {preferred_date} at {preferred_time}.")
     return appointment
 
 
@@ -590,6 +709,7 @@ def create_call_record(
             ),
         )
         db.commit()
+    log_audit("create", "call_record", record.id, f"Logged {intent} call from {caller_number}.")
     return record
 
 
@@ -608,20 +728,19 @@ def slot_prompt() -> str:
 
 
 def build_dashboard_context() -> dict[str, object]:
-    appointments = fetch_appointments(limit=10)
-    call_records = fetch_call_records(limit=10)
-    messages = fetch_messages(limit=10)
-    slots = fetch_slots()
-    settings = fetch_clinic_settings()
     analytics = fetch_analytics()
     return {
         "stats": analytics["totals"],
-        "appointments": appointments,
-        "call_records": call_records,
-        "messages": messages,
+        "appointments": fetch_appointments(limit=10),
+        "call_records": fetch_call_records(limit=10),
+        "messages": fetch_messages(limit=10),
+        "contact_requests": fetch_contact_requests(limit=5),
+        "audit_logs": fetch_audit_logs(limit=8),
+        "calendar_entries": fetch_calendar_entries()[:5],
+        "patient_profiles": fetch_patient_profiles(limit=5),
         "faqs": FAQS,
-        "slots": slots,
-        "settings": settings,
+        "slots": fetch_slots(),
+        "settings": fetch_clinic_settings(),
         "analytics": analytics,
         "statuses": APPOINTMENT_STATUSES,
         "lead_scores": LEAD_SCORES,
@@ -645,14 +764,12 @@ init_db()
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request) -> HTMLResponse:
-    context = build_dashboard_context()
-    return templates.TemplateResponse(request, "landing.html", context)
+    return templates.TemplateResponse(request, "landing.html", build_dashboard_context())
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
-    context = build_dashboard_context()
-    return templates.TemplateResponse(request, "dashboard.html", context)
+    return templates.TemplateResponse(request, "dashboard.html", build_dashboard_context())
 
 
 @app.get("/appointments", response_class=HTMLResponse)
@@ -708,6 +825,27 @@ async def docs_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "docs.html", context)
 
 
+@app.get("/calendar", response_class=HTMLResponse)
+async def calendar_page(request: Request) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update({"page_title": "Calendar", "calendar_entries": fetch_calendar_entries()})
+    return templates.TemplateResponse(request, "calendar.html", context)
+
+
+@app.get("/patients", response_class=HTMLResponse)
+async def patients_page(request: Request, q: str = Query(default="")) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update({"page_title": "Patients", "patient_profiles": fetch_patient_profiles(limit=300, search=q), "filters": {"q": q}})
+    return templates.TemplateResponse(request, "patients.html", context)
+
+
+@app.get("/audit", response_class=HTMLResponse)
+async def audit_page(request: Request) -> HTMLResponse:
+    context = build_dashboard_context()
+    context.update({"page_title": "Audit Log", "audit_logs": fetch_audit_logs(limit=200)})
+    return templates.TemplateResponse(request, "audit.html", context)
+
+
 @app.get("/health")
 async def healthcheck() -> JSONResponse:
     return JSONResponse({"status": "ok"})
@@ -732,6 +870,28 @@ async def dashboard_data() -> JSONResponse:
 @app.get("/api/available-slots")
 async def available_slots() -> JSONResponse:
     return JSONResponse({"slots": fetch_slots()})
+
+
+@app.post("/api/contact-request")
+async def create_contact_request(
+    name: str = Form(...),
+    clinic_name: str = Form(...),
+    phone_number: str = Form(...),
+    message: str = Form(...),
+) -> JSONResponse:
+    request_id = str(uuid4())
+    created_at = datetime.now(UTC).isoformat()
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (request_id, name, clinic_name, phone_number, message, created_at),
+        )
+        db.commit()
+    log_audit("create", "contact_request", request_id, f"New demo request from {name} at {clinic_name}.")
+    return JSONResponse({"message": "Demo request submitted"})
 
 
 @app.post("/api/simulate-call")
@@ -812,6 +972,7 @@ async def update_appointment_status(appointment_id: str, status: str = Form(...)
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Appointment not found")
+    log_audit("update", "appointment", appointment_id, f"Updated appointment status to {status}.")
     return JSONResponse({"message": "Appointment status updated"})
 
 
@@ -826,6 +987,7 @@ async def update_appointment(
     status: str = Form(...),
     notes: str = Form(default=""),
 ) -> JSONResponse:
+    check_double_booking(preferred_date, preferred_time, exclude_appointment_id=appointment_id)
     with get_db() as db:
         result = db.execute(
             """
@@ -838,6 +1000,7 @@ async def update_appointment(
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Appointment not found")
+    log_audit("update", "appointment", appointment_id, f"Updated appointment for {patient_name} on {preferred_date}.")
     return JSONResponse({"message": "Appointment updated"})
 
 
@@ -848,6 +1011,7 @@ async def delete_appointment(appointment_id: str) -> JSONResponse:
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Appointment not found")
+    log_audit("delete", "appointment", appointment_id, "Deleted appointment.")
     return JSONResponse({"message": "Appointment deleted"})
 
 
@@ -858,6 +1022,7 @@ async def update_call_lead_score(call_id: str, lead_score: str = Form(...)) -> J
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Call not found")
+    log_audit("update", "call_record", call_id, f"Updated lead score to {lead_score}.")
     return JSONResponse({"message": "Call lead score updated"})
 
 
@@ -866,6 +1031,7 @@ async def create_slot(slot: SlotInput) -> JSONResponse:
     with get_db() as db:
         db.execute("INSERT INTO slots (slot_date, slot_time) VALUES (?, ?)", (slot.date, slot.time))
         db.commit()
+    log_audit("create", "slot", None, f"Added slot {slot.date} {slot.time}.")
     return JSONResponse({"message": "Slot added", "slots": fetch_slots()})
 
 
@@ -876,6 +1042,7 @@ async def delete_slot(slot_id: int) -> JSONResponse:
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Slot not found")
+    log_audit("delete", "slot", str(slot_id), "Deleted slot.")
     return JSONResponse({"message": "Slot removed", "slots": fetch_slots()})
 
 
@@ -891,6 +1058,7 @@ async def update_settings(payload: ClinicSettingsInput) -> JSONResponse:
             (payload.clinic_name, payload.clinic_timings, payload.clinic_address),
         )
         db.commit()
+    log_audit("update", "clinic_settings", "1", "Updated clinic settings.")
     return JSONResponse({"message": "Clinic settings updated", "settings": fetch_clinic_settings()})
 
 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Calendar View</p><h1>Review appointments by day and spot load quickly.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/appointments">Appointments</a></div>
+    </section>
+    <section class="content-grid single-column">
+      {% for day in calendar_entries %}
+        <article class="panel">
+          <div class="panel-header"><h2>{{ day.date }}</h2><p>{{ day.count }} appointment(s)</p></div>
+          <div class="panel-body">
+            <ul class="faq-list">
+              {% for item in day.appointments %}
+                <li>
+                  <div><strong>{{ item.preferred_time }} - {{ item.patient_name }}</strong><span>{{ item.reason_for_visit }}</span></div>
+                  <div class="record-meta"><span>{{ item.phone_number }}</span><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No appointments scheduled yet.</p></div></article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>

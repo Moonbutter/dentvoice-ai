@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patients - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Patient Profiles</p><h1>Track repeat patients and their recent history.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/appointments">Appointments</a></div>
+    </section>
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/patients" class="filter-grid short-filter-grid">
+          <label><span>Search patient</span><input name="q" value="{{ filters.q }}" placeholder="Name, phone, notes"></label>
+          <button type="submit" class="primary-button">Search</button>
+        </form>
+      </div>
+    </section>
+    <section class="content-grid">
+      {% for item in patient_profiles %}
+        <article class="panel">
+          <div class="panel-body">
+            <strong>{{ item.patient_name }}</strong>
+            <p class="message-paragraph">{{ item.latest_reason }}</p>
+            <span class="muted-line">{{ item.phone_number }}</span>
+            <span class="muted-line">{{ item.appointment_count }} appointment(s)</span>
+            <span class="muted-line">Latest visit: {{ item.latest_visit_date }}</span>
+            {% if item.notes_preview %}<span class="muted-line">Note: {{ item.notes_preview }}</span>{% endif %}
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No patient profiles match this search.</p></div></article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>
