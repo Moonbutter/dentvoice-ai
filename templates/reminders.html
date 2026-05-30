@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reminder Queue - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Reminder Queue</p><h1>Schedule and track reminders without paid messaging yet.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/inbox">Inbox</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/reminders" class="filter-grid short-filter-grid">
+          <label><span>Status</span><select name="status"><option value="">All</option><option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option><option value="ready" {% if filters.status == 'ready' %}selected{% endif %}>Ready</option><option value="sent" {% if filters.status == 'sent' %}selected{% endif %}>Sent</option><option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option></select></label>
+          <button type="submit" class="primary-button">Filter</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Upcoming Candidates</h2><p>Create reminders for active appointments that still need patient communication</p></div>
+        <div class="panel-body">
+          {% if reminder_candidates %}
+            <div class="task-grid">
+              {% for item in reminder_candidates %}
+                <form class="reminder-create-form task-card" data-appointment-id="{{ item.appointment_id }}">
+                  <div class="task-card-top">
+                    <strong>{{ item.patient_name }}</strong>
+                    <span class="pill">{{ item.preferred_date }} · {{ item.preferred_time }}</span>
+                  </div>
+                  <span class="muted-line">{{ item.phone_number }}</span>
+                  <input type="hidden" name="appointment_id" value="{{ item.appointment_id }}">
+                  <input type="hidden" name="patient_name" value="{{ item.patient_name }}">
+                  <input type="hidden" name="phone_number" value="{{ item.phone_number }}">
+                  <label><span>Reminder type</span><select name="reminder_type"><option value="appointment">Appointment reminder</option><option value="follow_up">Follow-up reminder</option></select></label>
+                  <label><span>Scheduled for</span><input type="datetime-local" name="scheduled_for" required></label>
+                  <label><span>Note</span><textarea name="note" rows="3">{{ item.suggested_note }}</textarea></label>
+                  <button type="submit" class="primary-button">Queue Reminder</button>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="empty-state">No reminder candidates right now.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Queued Reminders</h2><p>Update queue state as the team works through reminders manually</p></div>
+        <div class="panel-body">
+          {% if reminders %}
+            <div class="task-grid">
+              {% for item in reminders %}
+                <form class="reminder-update-form task-card" data-reminder-id="{{ item.id }}">
+                  <div class="task-card-top">
+                    <strong>{{ item.patient_name }}</strong>
+                    <span class="pill">{{ item.status.title() }}</span>
+                  </div>
+                  <span class="muted-line">{{ item.phone_number }}</span>
+                  <span class="muted-line">{{ item.reminder_type.replace("_", " ").title() }} · {{ item.scheduled_for }}</span>
+                  <label><span>Status</span><select name="status"><option value="pending" {% if item.status == 'pending' %}selected{% endif %}>Pending</option><option value="ready" {% if item.status == 'ready' %}selected{% endif %}>Ready</option><option value="sent" {% if item.status == 'sent' %}selected{% endif %}>Sent</option><option value="cancelled" {% if item.status == 'cancelled' %}selected{% endif %}>Cancelled</option></select></label>
+                  <label><span>Note</span><textarea name="note" rows="3">{{ item.note }}</textarea></label>
+                  <button type="submit" class="secondary-button">Save Reminder</button>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="empty-state">No reminders in the queue yet.</p>
+          {% endif %}
+        </div>
+      </article>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receptionist Inbox - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Receptionist Inbox</p><h1>Work the clinic’s callbacks, confirmations, and follow-up tasks.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/reminders">Reminders</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/inbox" class="filter-grid" data-save-filters="inbox">
+          <label><span>Search task</span><input name="q" value="{{ filters.q }}" placeholder="Patient, phone, note"></label>
+          <label><span>Status</span><select name="status"><option value="">All</option>{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if filters.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+          <label><span>Priority</span><select name="priority"><option value="">All</option>{% for task_priority in task_priorities %}<option value="{{ task_priority }}" {% if filters.priority == task_priority %}selected{% endif %}>{{ task_priority.title() }}</option>{% endfor %}</select></label>
+          <div class="form-actions-row">
+            <button type="submit" class="primary-button">Apply</button>
+            <button type="button" class="secondary-button save-filter-button" data-save-filter-target="inbox">Save Filter</button>
+            <button type="button" class="secondary-button clear-filter-button" data-clear-filter-target="inbox">Clear Saved</button>
+          </div>
+        </form>
+        <div class="saved-filter-row" data-saved-filter-list="inbox"></div>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      {% for task in receptionist_tasks %}
+        <article class="panel">
+          <div class="panel-body">
+            <form class="task-edit-form task-card" data-task-id="{{ task.id }}">
+              <div class="task-card-top">
+                <strong>{{ task.patient_name }}</strong>
+                <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
+              </div>
+              <span class="muted-line">{{ task.phone_number }}</span>
+              <label><span>Follow-up note</span><textarea name="note" rows="4">{{ task.note }}</textarea></label>
+              <div class="split-grid">
+                <label><span>Due date</span><input type="date" name="due_date" value="{{ task.due_date }}"></label>
+                <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if task.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+              </div>
+              <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}" {% if task.priority == task_priority %}selected{% endif %}>{{ task_priority.title() }}</option>{% endfor %}</select></label>
+              <button type="submit" class="primary-button">Save Task</button>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No inbox tasks match these filters.</p></div></article>
+      {% endfor %}
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

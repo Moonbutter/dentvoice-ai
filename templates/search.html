@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Search - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Global Search</p><h1>Search across appointments, calls, patients, leads, and tasks.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/analytics">Analytics</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+
+    <section class="panel filter-panel">
+      <div class="panel-body">
+        <form method="get" action="/search" class="filter-grid short-filter-grid">
+          <label><span>Search everything</span><input name="q" value="{{ search_query }}" placeholder="Patient, clinic, phone, note, FAQ topic"></label>
+          <button type="submit" class="primary-button">Search</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      {% for section, items in search_results.items() %}
+        <article class="panel">
+          <div class="panel-header"><h2>{{ section.replace("_", " ").title() }}</h2><p>{% if search_query %}Results for "{{ search_query }}"{% else %}Enter a query to search the product{% endif %}</p></div>
+          <div class="panel-body">
+            {% if items %}
+              <ul class="faq-list">
+                {% for item in items %}
+                  <li>
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <span>{{ item.detail }}</span>
+                    </div>
+                    <div class="record-meta">
+                      <span>{{ item.meta }}</span>
+                      <a class="link-inline" href="{{ item.href }}">Open</a>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="empty-state">No {{ section.replace("_", " ") }} matched.</p>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>

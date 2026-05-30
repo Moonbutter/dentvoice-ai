@@ -20,6 +20,7 @@
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/appointments">Appointments</a>
         <a class="secondary-button link-button" href="/calls">Calls</a>
+        <a class="secondary-button link-button" href="/reminders">Reminders</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
@@ -41,81 +42,35 @@
     <section class="content-grid">
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Status</h2><p>Operational state of saved bookings</p></div>
-        <div class="panel-body">
-          <div class="chart-card-title">Status distribution</div>
-          <div class="chart-stack">
-            {% for item in analytics_charts.appointments_by_status %}
-              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-body chart-panel-body"><canvas id="appointments-status-chart" height="260"></canvas></div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Source</h2><p>Where bookings are coming from</p></div>
-        <div class="panel-body">
-          <div class="chart-card-title">Source split</div>
-          <div class="chart-stack">
-            {% for item in analytics_charts.appointments_by_source %}
-              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-body chart-panel-body"><canvas id="appointments-source-chart" height="260"></canvas></div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Calls by Intent</h2><p>Why patients are reaching the clinic</p></div>
-        <div class="panel-body">
-          <div class="chart-card-title">Intent mix</div>
-          <div class="chart-stack">
-            {% for item in analytics_charts.calls_by_intent %}
-              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-body chart-panel-body"><canvas id="calls-intent-chart" height="260"></canvas></div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Lead Scores</h2><p>How urgently the team should act</p></div>
-        <div class="panel-body">
-          <div class="chart-card-title">Lead quality</div>
-          <div class="chart-stack">
-            {% for item in analytics_charts.calls_by_lead_score %}
-              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-body chart-panel-body"><canvas id="lead-score-chart" height="260"></canvas></div>
       </article>
       <article class="panel">
-        <div class="panel-header"><h2>Receptionist Tasks</h2><p>Manual workflow still happening alongside AI</p></div>
-        <div class="panel-body">
-          <div class="chart-card-title">Task progress</div>
-          <div class="chart-stack">
-            {% for item in analytics_charts.tasks_by_status %}
-              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-header"><h2>Task Priority Mix</h2><p>Where the receptionist team should focus next</p></div>
+        <div class="panel-body chart-panel-body"><canvas id="task-priority-chart" height="260"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Lead Pipeline</h2><p>How demo requests are moving through the CRM</p></div>
+        <div class="panel-body chart-panel-body"><canvas id="lead-pipeline-chart" height="260"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Reminder Queue</h2><p>Volume of reminders still pending versus already worked</p></div>
+        <div class="panel-body chart-panel-body"><canvas id="reminder-status-chart" height="260"></canvas></div>
       </article>
       <article class="panel panel-span-two">
-        <div class="panel-header"><h2>Last 7 Days</h2><p>Simple activity trend without paid analytics tools</p></div>
-        <div class="panel-body">
-          <div class="chart-legend">
-            <span><i class="legend-swatch appointments"></i>Appointments</span>
-            <span><i class="legend-swatch calls"></i>Calls</span>
-            <span><i class="legend-swatch contacts"></i>Demo Requests</span>
-          </div>
-          <div class="trend-chart">
-            {% for item in analytics_charts.recent_days %}
-              <div class="trend-day">
-                <div class="trend-bars">
-                  <i class="trend-bar appointments" style="height: {{ item.appointment_percent }}%"></i>
-                  <i class="trend-bar calls" style="height: {{ item.call_percent }}%"></i>
-                  <i class="trend-bar contacts" style="height: {{ item.contact_percent }}%"></i>
-                </div>
-                <strong>{{ item.date[5:] }}</strong>
-                <span>{{ item.appointments }} A / {{ item.calls }} C / {{ item.contacts }} D</span>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
+        <div class="panel-header"><h2>Last 7 Days</h2><p>Appointments, calls, and demo requests on one timeline</p></div>
+        <div class="panel-body chart-panel-body"><canvas id="recent-trend-chart" height="140"></canvas></div>
       </article>
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>What These Charts Mean</h2><p>A quick learning layer for understanding the analytics</p></div>
@@ -130,5 +85,65 @@
       </article>
     </section>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    const chartData = {{ chartjs_data | safe }};
+    const chartDefaults = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(20, 108, 120, 0.08)" } },
+        x: { grid: { display: false } }
+      }
+    };
+
+    function makeBarChart(id, labels, values, color) {
+      const target = document.getElementById(id);
+      if (!target || !window.Chart) return;
+      new Chart(target, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{ data: values, backgroundColor: color, borderRadius: 12, borderSkipped: false }]
+        },
+        options: chartDefaults
+      });
+    }
+
+    function makeLineChart() {
+      const target = document.getElementById("recent-trend-chart");
+      if (!target || !window.Chart) return;
+      new Chart(target, {
+        type: "line",
+        data: {
+          labels: chartData.recent_days.labels,
+          datasets: [
+            { label: "Appointments", data: chartData.recent_days.appointments, borderColor: "#b96837", backgroundColor: "rgba(185, 104, 55, 0.12)", tension: 0.35, fill: true },
+            { label: "Calls", data: chartData.recent_days.calls, borderColor: "#146c78", backgroundColor: "rgba(20, 108, 120, 0.12)", tension: 0.35, fill: true },
+            { label: "Demo Requests", data: chartData.recent_days.contacts, borderColor: "#4f9c2f", backgroundColor: "rgba(79, 156, 47, 0.12)", tension: 0.35, fill: true }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom" } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(20, 108, 120, 0.08)" } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    makeBarChart("appointments-status-chart", chartData.appointments_by_status.labels, chartData.appointments_by_status.values, "rgba(185, 104, 55, 0.85)");
+    makeBarChart("appointments-source-chart", chartData.appointments_by_source.labels, chartData.appointments_by_source.values, "rgba(124, 63, 29, 0.82)");
+    makeBarChart("calls-intent-chart", chartData.calls_by_intent.labels, chartData.calls_by_intent.values, "rgba(20, 108, 120, 0.82)");
+    makeBarChart("lead-score-chart", chartData.calls_by_lead_score.labels, chartData.calls_by_lead_score.values, "rgba(105, 201, 213, 0.9)");
+    makeBarChart("task-priority-chart", chartData.tasks_by_priority.labels, chartData.tasks_by_priority.values, "rgba(255, 155, 107, 0.92)");
+    makeBarChart("lead-pipeline-chart", chartData.contacts_by_status.labels, chartData.contacts_by_status.values, "rgba(79, 156, 47, 0.82)");
+    makeBarChart("reminder-status-chart", chartData.reminders_by_status.labels, chartData.reminders_by_status.values, "rgba(139, 92, 246, 0.76)");
+    makeLineChart();
+  </script>
 </body>
 </html>

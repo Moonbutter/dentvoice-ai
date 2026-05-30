@@ -34,8 +34,11 @@
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
         <a class="secondary-button link-button" href="/calendar">Calendar</a>
         <a class="secondary-button link-button" href="/patients">Patients</a>
+        <a class="secondary-button link-button" href="/inbox">Inbox</a>
+        <a class="secondary-button link-button" href="/reminders">Reminders</a>
         <a class="secondary-button link-button" href="/leads">Leads</a>
         <a class="secondary-button link-button" href="/missed-leads">Missed Leads</a>
+        <a class="secondary-button link-button" href="/search">Search</a>
         <a class="secondary-button link-button" href="/audit">Audit</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
@@ -51,6 +54,7 @@
       <article class="stat-card"><span class="stat-label">Demo Requests</span><strong class="stat-value">{{ stats.contacts }}</strong></article>
       <article class="stat-card"><span class="stat-label">Missed Leads</span><strong class="stat-value">{{ stats.missed_leads }}</strong></article>
       <article class="stat-card"><span class="stat-label">Open Tasks</span><strong class="stat-value">{{ stats.open_tasks }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Pending Reminders</span><strong class="stat-value">{{ stats.pending_reminders }}</strong></article>
     </section>
 
     <section class="content-grid">
@@ -136,6 +140,7 @@
               <label><span>Due date</span><input type="date" name="due_date" required></label>
               <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}">{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
             </div>
+            <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}">{{ task_priority.title() }}</option>{% endfor %}</select></label>
             <button type="submit" class="primary-button">Create Task</button>
           </form>
         </div>
@@ -283,7 +288,7 @@
                 <form class="task-edit-form task-card" data-task-id="{{ task.id }}">
                   <div class="task-card-top">
                     <strong>{{ task.patient_name }}</strong>
-                    <span class="pill">{{ task.status.replace("_", " ").title() }}</span>
+                    <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
                   </div>
                   <span class="muted-line">{{ task.phone_number }}</span>
                   <label><span>Follow-up note</span><textarea name="note" rows="3">{{ task.note }}</textarea></label>
@@ -291,6 +296,7 @@
                     <label><span>Due date</span><input type="date" name="due_date" value="{{ task.due_date }}"></label>
                     <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if task.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
                   </div>
+                  <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}" {% if task.priority == task_priority %}selected{% endif %}>{{ task_priority.title() }}</option>{% endfor %}</select></label>
                   <button type="submit" class="secondary-button">Save Task</button>
                 </form>
               {% endfor %}
@@ -298,6 +304,36 @@
           {% else %}
             <p class="empty-state">No receptionist tasks yet.</p>
           {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Reminder Queue</h2><p>Queue in-app reminders before wiring paid messaging providers later</p></div>
+        <div class="panel-body">
+          {% if reminder_candidates %}
+            <div class="task-grid">
+              {% for item in reminder_candidates %}
+                <form class="reminder-create-form task-card" data-appointment-id="{{ item.appointment_id }}">
+                  <div class="task-card-top">
+                    <strong>{{ item.patient_name }}</strong>
+                    <span class="pill">{{ item.preferred_date }}</span>
+                  </div>
+                  <span class="muted-line">{{ item.phone_number }}</span>
+                  <span class="muted-line">{{ item.reason_for_visit }} at {{ item.preferred_time }}</span>
+                  <input type="hidden" name="appointment_id" value="{{ item.appointment_id }}">
+                  <input type="hidden" name="patient_name" value="{{ item.patient_name }}">
+                  <input type="hidden" name="phone_number" value="{{ item.phone_number }}">
+                  <label><span>Reminder type</span><select name="reminder_type"><option value="appointment">Appointment reminder</option><option value="follow_up">Follow-up reminder</option></select></label>
+                  <label><span>Scheduled for</span><input type="datetime-local" name="scheduled_for" required></label>
+                  <label><span>Note</span><textarea name="note" rows="3">{{ item.suggested_note }}</textarea></label>
+                  <button type="submit" class="primary-button">Queue Reminder</button>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="empty-state">No upcoming reminder candidates right now.</p>
+          {% endif %}
+          <div class="top-gap-inline"><a class="link-inline" href="/reminders">Open full reminder queue</a></div>
         </div>
       </article>
 

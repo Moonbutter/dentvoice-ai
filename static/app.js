@@ -329,6 +329,32 @@ document.querySelectorAll(".missed-lead-task-form").forEach((form) => {
   });
 });
 
+document.querySelectorAll(".reminder-create-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm("/api/reminders", formData);
+      refreshPage("Reminder queued");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".reminder-update-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/reminders/${form.dataset.reminderId}/update`, formData);
+      refreshPage("Reminder updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
 document.getElementById("settings-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {

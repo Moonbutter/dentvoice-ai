@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
@@ -114,6 +115,7 @@ APPOINTMENT_STATUSES = ["new", "confirmed", "completed", "cancelled", "needs_fol
 CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "faq", "emergency", "general"]
 LEAD_SCORES = ["hot", "warm", "cold"]
 TASK_STATUSES = ["open", "in_progress", "done"]
+TASK_PRIORITIES = ["high", "medium", "low"]
 APPOINTMENT_SOURCES = ["admin", "voice_call", "simulated_call", "api"]
 CONTACT_STATUSES = ["new", "contacted", "qualified", "closed"]
 
@@ -236,7 +238,20 @@ def init_db() -> None:
                 note TEXT NOT NULL,
                 due_date TEXT NOT NULL,
                 status TEXT NOT NULL,
+                priority TEXT NOT NULL DEFAULT 'medium',
                 related_appointment_id TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS reminder_queue (
+                id TEXT PRIMARY KEY,
+                appointment_id TEXT NOT NULL,
+                patient_name TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                reminder_type TEXT NOT NULL,
+                scheduled_for TEXT NOT NULL,
+                status TEXT NOT NULL,
+                note TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
             """
@@ -260,6 +275,8 @@ def init_db() -> None:
             db.execute("ALTER TABLE contact_requests ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
         if not column_exists(db, "contact_requests", "owner_notes"):
             db.execute("ALTER TABLE contact_requests ADD COLUMN owner_notes TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "receptionist_tasks", "priority"):
+            db.execute("ALTER TABLE receptionist_tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'")
 
         existing_settings = db.execute("SELECT COUNT(*) AS count FROM clinic_settings").fetchone()["count"]
         if existing_settings == 0:
@@ -496,19 +513,31 @@ def fetch_audit_logs(limit: int = 50) -> list[dict[str, str]]:
         return [dict(row) for row in rows]
 
 
-def fetch_receptionist_tasks(limit: int = 100, status: str = "") -> list[dict[str, str]]:
+def fetch_receptionist_tasks(limit: int = 100, status: str = "", search: str = "", priority: str = "") -> list[dict[str, str]]:
     conditions: list[str] = []
     params: list[object] = []
     if status:
         conditions.append("status = ?")
         params.append(status)
+    if search:
+        pattern = f"%{search}%"
+        conditions.append("(patient_name LIKE ? OR phone_number LIKE ? OR note LIKE ?)")
+        params.extend([pattern, pattern, pattern])
+    if priority:
+        conditions.append("priority = ?")
+        params.append(priority)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     query = f"""
-        SELECT id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at
+        SELECT id, patient_name, phone_number, note, due_date, status, priority, related_appointment_id, created_at
         FROM receptionist_tasks
         {where_clause}
         ORDER BY
+            CASE priority
+                WHEN 'high' THEN 1
+                WHEN 'medium' THEN 2
+                ELSE 3
+            END,
             CASE status
                 WHEN 'open' THEN 1
                 WHEN 'in_progress' THEN 2
@@ -523,6 +552,63 @@ def fetch_receptionist_tasks(limit: int = 100, status: str = "") -> list[dict[st
     with get_db() as db:
         rows = db.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+
+def fetch_reminders(limit: int = 200, status: str = "") -> list[dict[str, str]]:
+    conditions: list[str] = []
+    params: list[object] = []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    query = f"""
+        SELECT id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, created_at
+        FROM reminder_queue
+        {where_clause}
+        ORDER BY
+            CASE status
+                WHEN 'pending' THEN 1
+                WHEN 'ready' THEN 2
+                WHEN 'sent' THEN 3
+                ELSE 4
+            END,
+            scheduled_for ASC,
+            datetime(created_at) DESC
+        LIMIT ?
+    """
+    params.append(limit)
+
+    with get_db() as db:
+        rows = db.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+
+def fetch_upcoming_reminder_candidates(limit: int = 20) -> list[dict[str, str]]:
+    appointments = [
+        item for item in fetch_appointments(limit=1000)
+        if item.status in {"new", "confirmed", "needs_follow_up"}
+    ]
+    existing = {item["appointment_id"] for item in fetch_reminders(limit=1000, status="pending")} | {
+        item["appointment_id"] for item in fetch_reminders(limit=1000, status="ready")
+    }
+    appointments.sort(key=lambda item: (item.preferred_date, item.preferred_time))
+    candidates = []
+    for item in appointments:
+        if item.id in existing:
+            continue
+        candidates.append(
+            {
+                "appointment_id": item.id,
+                "patient_name": item.patient_name,
+                "phone_number": item.phone_number,
+                "preferred_date": item.preferred_date,
+                "preferred_time": item.preferred_time,
+                "reason_for_visit": item.reason_for_visit,
+                "suggested_note": f"Reminder: {item.reason_for_visit} on {item.preferred_date} at {item.preferred_time}.",
+            }
+        )
+    return candidates[:limit]
 
 
 def fetch_patient_profiles(limit: int = 200, search: str = "") -> list[dict[str, object]]:
@@ -614,6 +700,92 @@ def fetch_missed_leads(limit: int = 100, search: str = "", lead_score: str = "")
     return records[:limit]
 
 
+def fetch_global_search_results(query: str) -> dict[str, list[dict[str, str]]]:
+    if not query.strip():
+        return {"appointments": [], "calls": [], "patients": [], "leads": [], "tasks": [], "faqs": [], "reminders": []}
+
+    appointments = fetch_appointments(limit=8, search=query)
+    calls = fetch_call_records(limit=8, search=query)
+    patients = fetch_patient_profiles(limit=8, search=query)
+    leads = fetch_contact_requests(limit=8, search=query)
+    tasks = fetch_receptionist_tasks(limit=8, search=query)
+    reminders = [item for item in fetch_reminders(limit=50) if query.lower() in f"{item['patient_name']} {item['phone_number']} {item['note']} {item['reminder_type']}".lower()][:8]
+    faqs = [item for item in fetch_faq_entries(limit=50) if query.lower() in f"{item['question']} {item['answer']}".lower()][:8]
+
+    return {
+        "appointments": [
+            {
+                "id": item.id,
+                "title": item.patient_name,
+                "meta": f"{item.preferred_date} · {item.preferred_time}",
+                "detail": item.reason_for_visit,
+                "href": "/appointments",
+            }
+            for item in appointments
+        ],
+        "calls": [
+            {
+                "id": item.id,
+                "title": item.patient_name or item.caller_number,
+                "meta": item.intent.replace("_", " ").title(),
+                "detail": item.summary,
+                "href": "/calls",
+            }
+            for item in calls
+        ],
+        "patients": [
+            {
+                "id": item["phone_number"],
+                "title": str(item["patient_name"]),
+                "meta": str(item["phone_number"]),
+                "detail": f"{item['appointment_count']} appointment(s)",
+                "href": f"/patients/detail?phone={item['patient_query']}",
+            }
+            for item in patients
+        ],
+        "leads": [
+            {
+                "id": item["id"],
+                "title": item["name"],
+                "meta": item["clinic_name"],
+                "detail": item["message"],
+                "href": "/leads",
+            }
+            for item in leads
+        ],
+        "tasks": [
+            {
+                "id": item["id"],
+                "title": item["patient_name"],
+                "meta": f"{item['priority'].title()} priority · {item['status'].replace('_', ' ').title()}",
+                "detail": item["note"],
+                "href": "/inbox",
+            }
+            for item in tasks
+        ],
+        "faqs": [
+            {
+                "id": str(item["id"]),
+                "title": str(item["question"]),
+                "meta": "FAQ manager",
+                "detail": str(item["answer"]),
+                "href": "/dashboard",
+            }
+            for item in faqs
+        ],
+        "reminders": [
+            {
+                "id": item["id"],
+                "title": item["patient_name"],
+                "meta": f"{item['reminder_type'].replace('_', ' ').title()} · {item['status'].title()}",
+                "detail": item["note"],
+                "href": "/reminders",
+            }
+            for item in reminders
+        ],
+    }
+
+
 def fetch_calendar_entries() -> list[dict[str, object]]:
     grouped: dict[str, list[AppointmentRequest]] = defaultdict(list)
     for item in fetch_appointments(limit=1000):
@@ -637,13 +809,16 @@ def fetch_analytics() -> dict[str, object]:
     messages = fetch_messages(limit=1000)
     contacts = fetch_contact_requests(limit=1000)
     tasks = fetch_receptionist_tasks(limit=1000)
+    reminders = fetch_reminders(limit=1000)
 
     appointments_by_status = Counter(item.status for item in appointments)
     appointments_by_source = Counter(item.source for item in appointments)
     calls_by_intent = Counter(item.intent for item in calls)
     calls_by_lead_score = Counter(item.lead_score for item in calls)
     tasks_by_status = Counter(item["status"] for item in tasks)
+    tasks_by_priority = Counter(item["priority"] for item in tasks)
     contacts_by_status = Counter(item["status"] for item in contacts)
+    reminders_by_status = Counter(item["status"] for item in reminders)
 
     recent_days: list[dict[str, object]] = []
     today = datetime.now(UTC).date()
@@ -669,13 +844,16 @@ def fetch_analytics() -> dict[str, object]:
             "patients": len(fetch_patient_profiles(limit=1000)),
             "open_tasks": sum(1 for item in tasks if item["status"] != "done"),
             "missed_leads": len(fetch_missed_leads(limit=1000)),
+            "pending_reminders": sum(1 for item in reminders if item["status"] in {"pending", "ready"}),
         },
         "appointments_by_status": dict(appointments_by_status),
         "appointments_by_source": dict(appointments_by_source),
         "calls_by_intent": dict(calls_by_intent),
         "calls_by_lead_score": dict(calls_by_lead_score),
         "tasks_by_status": dict(tasks_by_status),
+        "tasks_by_priority": dict(tasks_by_priority),
         "contacts_by_status": dict(contacts_by_status),
+        "reminders_by_status": dict(reminders_by_status),
         "recent_days": recent_days,
         "conversion_rate": round((len(appointments) / len(calls)) * 100, 1) if calls else 0.0,
         "completion_rate": round((appointments_by_status.get("completed", 0) / len(appointments)) * 100, 1) if appointments else 0.0,
@@ -720,6 +898,45 @@ def build_trend_chart(days: list[dict[str, object]]) -> list[dict[str, object]]:
         }
         for item in days
     ]
+
+
+def build_chartjs_datasets(analytics: dict[str, object]) -> dict[str, object]:
+    return {
+        "appointments_by_status": {
+            "labels": [item.replace("_", " ").title() for item in APPOINTMENT_STATUSES],
+            "values": [analytics["appointments_by_status"].get(item, 0) for item in APPOINTMENT_STATUSES],
+        },
+        "appointments_by_source": {
+            "labels": [item.replace("_", " ").title() for item in APPOINTMENT_SOURCES],
+            "values": [analytics["appointments_by_source"].get(item, 0) for item in APPOINTMENT_SOURCES],
+        },
+        "calls_by_intent": {
+            "labels": [item.replace("_", " ").title() for item in CALL_INTENTS],
+            "values": [analytics["calls_by_intent"].get(item, 0) for item in CALL_INTENTS],
+        },
+        "calls_by_lead_score": {
+            "labels": [item.title() for item in LEAD_SCORES],
+            "values": [analytics["calls_by_lead_score"].get(item, 0) for item in LEAD_SCORES],
+        },
+        "tasks_by_priority": {
+            "labels": [item.title() for item in TASK_PRIORITIES],
+            "values": [analytics["tasks_by_priority"].get(item, 0) for item in TASK_PRIORITIES],
+        },
+        "contacts_by_status": {
+            "labels": [item.title() for item in CONTACT_STATUSES],
+            "values": [analytics["contacts_by_status"].get(item, 0) for item in CONTACT_STATUSES],
+        },
+        "reminders_by_status": {
+            "labels": ["Pending", "Ready", "Sent", "Cancelled"],
+            "values": [analytics["reminders_by_status"].get(item, 0) for item in ["pending", "ready", "sent", "cancelled"]],
+        },
+        "recent_days": {
+            "labels": [item["date"][5:] for item in analytics["recent_days"]],
+            "appointments": [item["appointments"] for item in analytics["recent_days"]],
+            "calls": [item["calls"] for item in analytics["recent_days"]],
+            "contacts": [item["contacts"] for item in analytics["recent_days"]],
+        },
+    }
 
 
 def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str) -> None:
@@ -1008,6 +1225,8 @@ def build_dashboard_context() -> dict[str, object]:
         "missed_leads": fetch_missed_leads(limit=5),
         "audit_logs": fetch_audit_logs(limit=8),
         "receptionist_tasks": fetch_receptionist_tasks(limit=8),
+        "reminders": fetch_reminders(limit=8),
+        "reminder_candidates": fetch_upcoming_reminder_candidates(limit=6),
         "calendar_entries": fetch_calendar_entries()[:5],
         "patient_profiles": fetch_patient_profiles(limit=5),
         "faqs": fetch_faq_entries(limit=8),
@@ -1015,18 +1234,22 @@ def build_dashboard_context() -> dict[str, object]:
         "settings": settings,
         "branding": branding,
         "analytics": analytics,
+        "chartjs_data": json.dumps(build_chartjs_datasets(analytics)),
         "analytics_charts": {
             "appointments_by_status": build_chart(analytics["appointments_by_status"], APPOINTMENT_STATUSES),
             "appointments_by_source": build_chart(analytics["appointments_by_source"], APPOINTMENT_SOURCES),
             "calls_by_intent": build_chart(analytics["calls_by_intent"], CALL_INTENTS),
             "calls_by_lead_score": build_chart(analytics["calls_by_lead_score"], LEAD_SCORES),
             "tasks_by_status": build_chart(analytics["tasks_by_status"], TASK_STATUSES),
+            "tasks_by_priority": build_chart(analytics["tasks_by_priority"], TASK_PRIORITIES),
             "contacts_by_status": build_chart(analytics["contacts_by_status"], CONTACT_STATUSES),
+            "reminders_by_status": build_chart(analytics["reminders_by_status"], ["pending", "ready", "sent", "cancelled"]),
             "recent_days": build_trend_chart(analytics["recent_days"]),
         },
         "statuses": APPOINTMENT_STATUSES,
         "lead_scores": LEAD_SCORES,
         "task_statuses": TASK_STATUSES,
+        "task_priorities": TASK_PRIORITIES,
         "contact_statuses": CONTACT_STATUSES,
         "default_admin_username": settings.get("admin_username", "admin"),
         "asset_version": ASSET_VERSION,
@@ -1149,6 +1372,69 @@ async def analytics_page(request: Request) -> HTMLResponse:
     context = build_dashboard_context()
     context.update({"page_title": "Analytics", "is_authenticated": True})
     return templates.TemplateResponse(request, "analytics.html", context)
+
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def inbox_page(
+    request: Request,
+    q: str = Query(default=""),
+    status: str = Query(default=""),
+    priority: str = Query(default=""),
+) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Receptionist Inbox",
+            "receptionist_tasks": fetch_receptionist_tasks(limit=200, status=status, search=q, priority=priority),
+            "filters": {"q": q, "status": status, "priority": priority},
+            "is_authenticated": True,
+        }
+    )
+    return templates.TemplateResponse(request, "inbox.html", context)
+
+
+@app.get("/reminders", response_class=HTMLResponse)
+async def reminders_page(
+    request: Request,
+    status: str = Query(default=""),
+) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Reminder Queue",
+            "reminders": fetch_reminders(limit=200, status=status),
+            "reminder_candidates": fetch_upcoming_reminder_candidates(limit=25),
+            "filters": {"status": status},
+            "is_authenticated": True,
+        }
+    )
+    return templates.TemplateResponse(request, "reminders.html", context)
+
+
+@app.get("/search", response_class=HTMLResponse)
+async def search_page(
+    request: Request,
+    q: str = Query(default=""),
+) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update(
+        {
+            "page_title": "Global Search",
+            "search_query": q,
+            "search_results": fetch_global_search_results(q),
+            "is_authenticated": True,
+        }
+    )
+    return templates.TemplateResponse(request, "search.html", context)
 
 
 @app.get("/docs", response_class=HTMLResponse)
@@ -1574,6 +1860,7 @@ async def create_receptionist_task(
     note: str = Form(...),
     due_date: str = Form(...),
     status: str = Form(default="open"),
+    priority: str = Form(default="medium"),
     related_appointment_id: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
@@ -1581,8 +1868,8 @@ async def create_receptionist_task(
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, related_appointment_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_id,
@@ -1591,6 +1878,7 @@ async def create_receptionist_task(
                 note,
                 due_date,
                 status,
+                priority,
                 related_appointment_id or None,
                 datetime.now(UTC).isoformat(),
             ),
@@ -1608,6 +1896,7 @@ async def create_missed_lead_task(
     phone_number: str = Form(...),
     note: str = Form(...),
     due_date: str = Form(...),
+    priority: str = Form(default="high"),
 ) -> JSONResponse:
     require_authenticated_api(request)
     task_id = str(uuid4())
@@ -1617,10 +1906,10 @@ async def create_missed_lead_task(
             raise HTTPException(status_code=404, detail="Call not found")
         db.execute(
             """
-            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, related_appointment_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (task_id, patient_name, phone_number, note, due_date, "open", None, datetime.now(UTC).isoformat()),
+            (task_id, patient_name, phone_number, note, due_date, "open", priority, None, datetime.now(UTC).isoformat()),
         )
         db.commit()
     log_audit("create", "receptionist_task", task_id, f"Created missed-lead recovery task for {patient_name}.")
@@ -1634,22 +1923,72 @@ async def update_receptionist_task(
     note: str = Form(...),
     due_date: str = Form(...),
     status: str = Form(...),
+    priority: str = Form(default="medium"),
 ) -> JSONResponse:
     require_authenticated_api(request)
     with get_db() as db:
         result = db.execute(
             """
             UPDATE receptionist_tasks
-            SET note = ?, due_date = ?, status = ?
+            SET note = ?, due_date = ?, status = ?, priority = ?
             WHERE id = ?
             """,
-            (note, due_date, status, task_id),
+            (note, due_date, status, priority, task_id),
         )
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Receptionist task not found")
     log_audit("update", "receptionist_task", task_id, f"Updated receptionist task to {status}.")
     return JSONResponse({"message": "Receptionist task updated"})
+
+
+@app.post("/api/reminders")
+async def create_reminder(
+    request: Request,
+    appointment_id: str = Form(...),
+    patient_name: str = Form(...),
+    phone_number: str = Form(...),
+    reminder_type: str = Form(...),
+    scheduled_for: str = Form(...),
+    note: str = Form(default=""),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    reminder_id = str(uuid4())
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO reminder_queue (id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (reminder_id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, "pending", note, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    log_audit("create", "reminder", reminder_id, f"Queued {reminder_type} reminder for {patient_name}.")
+    return JSONResponse({"message": "Reminder queued"})
+
+
+@app.post("/api/reminders/{reminder_id}/update")
+async def update_reminder(
+    request: Request,
+    reminder_id: str,
+    status: str = Form(...),
+    note: str = Form(default=""),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        result = db.execute(
+            """
+            UPDATE reminder_queue
+            SET status = ?, note = ?
+            WHERE id = ?
+            """,
+            (status, note, reminder_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Reminder not found")
+    log_audit("update", "reminder", reminder_id, f"Updated reminder to {status}.")
+    return JSONResponse({"message": "Reminder updated"})
 
 
 @app.get("/api/export/appointments.csv")
