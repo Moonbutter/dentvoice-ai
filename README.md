@@ -24,10 +24,16 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Audit log for product activity
 - Double-booking protection
 - In-app toast notifications
+- Free local admin authentication
+- Saved browser-based filters for operational pages
+- Receptionist follow-up task workflow
+- Onboarding walkthrough for new users
+- Clinic branding with custom logo text, tagline, and accent color
+- Visual analytics with chart-style summaries
 
 ## Project Structure
 
-- `app/main.py` - FastAPI app and in-memory business logic
+- `app/main.py` - FastAPI app, SQLite-backed business logic, and Twilio-style voice workflow
 - `templates/dashboard.html` - Dashboard UI
 - `static/styles.css` - Dashboard styling
 - `static/app.js` - Demo actions
@@ -57,6 +63,7 @@ uvicorn app.main:app --reload
 
 - `GET /` - Public landing page
 - `GET /dashboard` - Admin dashboard
+- `GET /login` - Local clinic admin login
 - `GET /appointments` - Appointment management page
 - `GET /calls` - Call management page
 - `GET /analytics` - Analytics page
@@ -77,6 +84,8 @@ uvicorn app.main:app --reload
 - `POST /api/appointments/{appointment_id}/delete` - Delete appointment
 - `POST /api/calls/{call_id}/lead-score` - Update call priority
 - `POST /api/settings` - Update clinic settings
+- `POST /api/receptionist-tasks` - Create receptionist follow-up task
+- `POST /api/receptionist-tasks/{task_id}/update` - Update receptionist follow-up task
 - `POST /api/slots` - Add booking slot
 - `POST /api/slots/{slot_id}/delete` - Remove booking slot
 - `POST /voice/incoming` - Twilio voice webhook
@@ -103,7 +112,7 @@ uvicorn app.main:app --reload
 
 - Replace menu-based slot selection with OpenAI-powered natural extraction
 - Connect real Twilio voice and WhatsApp APIs
-- Add login, clinic settings, and user roles
+- Add multi-user roles and stronger production auth
 - Integrate calendar and appointment confirmation workflows
 
 ## Deploy on Render

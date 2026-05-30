@@ -9,16 +9,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
     <section class="hero">
       <div>
+        <div class="brand-lockup">
+          <div class="logo-badge">{{ branding.logo_text }}</div>
+          <div>
         <p class="eyebrow">AI Receptionist for Dental Clinics</p>
         <h1>{{ settings.clinic_name }}</h1>
-        <p class="hero-copy">Your live admin workspace for appointments, calls, lead scoring, slot management, clinic settings, exports, follow-up notes, demo requests, and audit history.</p>
+          </div>
+        </div>
+        <p class="hero-copy">{{ branding.brand_tagline }}. Your live admin workspace for appointments, calls, lead scoring, slot management, clinic settings, exports, follow-up notes, demo requests, and audit history.</p>
         <div class="hero-meta">
           <span>{{ settings.clinic_timings }}</span>
           <span>{{ settings.clinic_address }}</span>
+          <span>{{ stats.open_tasks }} open receptionist tasks</span>
         </div>
       </div>
       <div class="hero-actions">
@@ -30,6 +36,7 @@
         <a class="secondary-button link-button" href="/patients">Patients</a>
         <a class="secondary-button link-button" href="/audit">Audit</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
+        <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
 
@@ -40,6 +47,7 @@
       <article class="stat-card"><span class="stat-label">WhatsApp Messages</span><strong class="stat-value">{{ stats.messages }}</strong></article>
       <article class="stat-card"><span class="stat-label">Patient Profiles</span><strong class="stat-value">{{ stats.patients }}</strong></article>
       <article class="stat-card"><span class="stat-label">Demo Requests</span><strong class="stat-value">{{ stats.contacts }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Open Tasks</span><strong class="stat-value">{{ stats.open_tasks }}</strong></article>
     </section>
 
     <section class="content-grid">
@@ -68,6 +76,15 @@
             <label><span>Clinic name</span><input name="clinic_name" value="{{ settings.clinic_name }}" required></label>
             <label><span>Clinic timings</span><input name="clinic_timings" value="{{ settings.clinic_timings }}" required></label>
             <label><span>Clinic address</span><input name="clinic_address" value="{{ settings.clinic_address }}" required></label>
+            <label><span>Brand tagline</span><input name="brand_tagline" value="{{ settings.brand_tagline }}" required></label>
+            <div class="split-grid">
+              <label><span>Accent color</span><input type="color" name="accent_color" value="{{ branding.accent_color }}" required></label>
+              <label><span>Logo text</span><input name="logo_text" value="{{ branding.logo_text }}" maxlength="4" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Admin username</span><input name="admin_username" value="{{ settings.admin_username }}" required></label>
+              <label><span>Admin password</span><input name="admin_password" value="{{ settings.admin_password }}" required></label>
+            </div>
             <button type="submit" class="primary-button">Update Settings</button>
           </form>
         </div>
@@ -81,6 +98,11 @@
               <div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.replace("_", " ").title() }}</span></div>
             {% endfor %}
           </div>
+          <div class="kpi-strip top-gap">
+            <div><strong>{{ analytics.conversion_rate }}%</strong><span>Call to booking rate</span></div>
+            <div><strong>{{ analytics.completion_rate }}%</strong><span>Completed visits</span></div>
+            <div><strong>{{ analytics.hot_lead_rate }}%</strong><span>Hot lead ratio</span></div>
+          </div>
           <a class="secondary-button link-button top-gap-inline" href="/analytics">Open Full Analytics</a>
         </div>
       </article>
@@ -90,10 +112,29 @@
         <div class="panel-body">
           <ul class="faq-list">
             <li><strong>Persistent SQLite storage</strong><span>Appointments, calls, slots, requests, and settings survive restarts.</span></li>
+            <li><strong>Local authentication</strong><span>Admin pages now use a free built-in login flow instead of staying public.</span></li>
             <li><strong>Lead scoring</strong><span>Calls can be marked hot, warm, or cold based on urgency and booking likelihood.</span></li>
-            <li><strong>Search, filters, and profiles</strong><span>Dedicated pages help staff review appointments, patients, and call activity faster.</span></li>
+            <li><strong>Saved filters and onboarding</strong><span>Browser-based saved filters and guided walkthroughs help staff learn the system faster.</span></li>
             <li><strong>Double-booking protection</strong><span>Conflicting appointment slots are blocked automatically.</span></li>
           </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Receptionist Follow-up Workflow</h2><p>Track callbacks, confirmations, and manual follow-up work</p></div>
+        <div class="panel-body">
+          <form id="task-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Patient name</span><input name="patient_name" required></label>
+              <label><span>Phone number</span><input name="phone_number" required></label>
+            </div>
+            <label><span>Receptionist note</span><textarea name="note" rows="3" placeholder="Call back after 6 PM, confirm braces consultation, share X-ray prep..." required></textarea></label>
+            <div class="split-grid">
+              <label><span>Due date</span><input type="date" name="due_date" required></label>
+              <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}">{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+            </div>
+            <button type="submit" class="primary-button">Create Task</button>
+          </form>
         </div>
       </article>
 
@@ -156,6 +197,33 @@
             </ul>
           {% else %}
             <p class="empty-state">No appointment requests yet.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Receptionist Task Board</h2><p>Open follow-ups, confirmations, and callbacks</p></div>
+        <div class="panel-body">
+          {% if receptionist_tasks %}
+            <div class="task-grid">
+              {% for task in receptionist_tasks %}
+                <form class="task-edit-form task-card" data-task-id="{{ task.id }}">
+                  <div class="task-card-top">
+                    <strong>{{ task.patient_name }}</strong>
+                    <span class="pill">{{ task.status.replace("_", " ").title() }}</span>
+                  </div>
+                  <span class="muted-line">{{ task.phone_number }}</span>
+                  <label><span>Follow-up note</span><textarea name="note" rows="3">{{ task.note }}</textarea></label>
+                  <div class="split-grid">
+                    <label><span>Due date</span><input type="date" name="due_date" value="{{ task.due_date }}"></label>
+                    <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if task.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+                  </div>
+                  <button type="submit" class="secondary-button">Save Task</button>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="empty-state">No receptionist tasks yet.</p>
           {% endif %}
         </div>
       </article>
@@ -238,6 +306,33 @@
           {% endif %}
         </div>
       </article>
+    </section>
+
+    <section id="onboarding-modal" class="onboarding-modal" data-onboarding="dashboard" hidden>
+      <div class="onboarding-card">
+        <p class="eyebrow">Quick Walkthrough</p>
+        <h2>Welcome to the clinic control room.</h2>
+        <div class="onboarding-step is-active">
+          <strong>1. Start on the dashboard</strong>
+          <span>See appointments, calls, patients, and urgent items in one place.</span>
+        </div>
+        <div class="onboarding-step">
+          <strong>2. Use appointments and calls pages</strong>
+          <span>Filter records, save views in your browser, and keep your work organized.</span>
+        </div>
+        <div class="onboarding-step">
+          <strong>3. Track manual follow-ups</strong>
+          <span>Create receptionist tasks for callbacks, confirmations, and reschedules.</span>
+        </div>
+        <div class="onboarding-step">
+          <strong>4. Customize your clinic brand</strong>
+          <span>Update colors, logo text, tagline, and even local admin credentials.</span>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="secondary-button" id="skip-onboarding">Skip</button>
+          <button type="button" class="primary-button" id="next-onboarding">Next</button>
+        </div>
+      </div>
     </section>
 
     <div id="toast" class="toast" hidden></div>

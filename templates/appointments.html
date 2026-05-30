@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
     <section class="hero compact-hero">
       <div>
@@ -19,12 +19,13 @@
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/analytics">Analytics</a>
+        <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
 
     <section class="panel filter-panel">
       <div class="panel-body">
-        <form method="get" action="/appointments" class="filter-grid">
+        <form method="get" action="/appointments" class="filter-grid" data-save-filters="appointments">
           <label><span>Search</span><input name="q" value="{{ filters.q }}" placeholder="Name, phone, reason"></label>
           <label>
             <span>Status</span>
@@ -48,6 +49,13 @@
           <label><span>Date</span><input type="date" name="preferred_date" value="{{ filters.preferred_date }}"></label>
           <button type="submit" class="primary-button">Apply Filters</button>
         </form>
+        <div class="saved-filter-row">
+          <div class="saved-filter-actions">
+            <button type="button" class="secondary-button save-filter-button" data-save-filter-target="appointments">Save Current Filter</button>
+            <button type="button" class="secondary-button clear-filter-button" data-clear-filter-target="appointments">Clear Saved</button>
+          </div>
+          <div class="saved-filter-list" data-saved-filter-list="appointments"></div>
+        </div>
       </div>
     </section>
 
@@ -87,6 +95,7 @@
         <article class="panel"><div class="panel-body"><p class="empty-state">No appointments match these filters.</p></div></article>
       {% endfor %}
     </section>
+  </main>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -5,15 +5,17 @@ import io
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
+from os import getenv
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.middleware.sessions import SessionMiddleware
 
 
 class FAQAnswer(BaseModel):
@@ -89,6 +91,11 @@ class ClinicSettingsInput(BaseModel):
     clinic_name: str
     clinic_timings: str
     clinic_address: str
+    brand_tagline: str
+    accent_color: str
+    logo_text: str
+    admin_username: str
+    admin_password: str
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -104,10 +111,12 @@ FAQS = [
 APPOINTMENT_STATUSES = ["new", "confirmed", "completed", "cancelled", "needs_follow_up"]
 CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "faq", "emergency", "general"]
 LEAD_SCORES = ["hot", "warm", "cold"]
+TASK_STATUSES = ["open", "in_progress", "done"]
 
 call_sessions: dict[str, CallSession] = {}
 
 app = FastAPI(title="DentVoice AI MVP")
+app.add_middleware(SessionMiddleware, secret_key=getenv("DENTVOICE_SESSION_SECRET", "dentvoice-local-secret"))
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -207,6 +216,17 @@ def init_db() -> None:
                 summary TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS receptionist_tasks (
+                id TEXT PRIMARY KEY,
+                patient_name TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                note TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                related_appointment_id TEXT,
+                created_at TEXT NOT NULL
+            );
             """
         )
 
@@ -214,15 +234,36 @@ def init_db() -> None:
             db.execute("ALTER TABLE appointments ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "call_records", "lead_score"):
             db.execute("ALTER TABLE call_records ADD COLUMN lead_score TEXT NOT NULL DEFAULT 'warm'")
+        if not column_exists(db, "clinic_settings", "brand_tagline"):
+            db.execute("ALTER TABLE clinic_settings ADD COLUMN brand_tagline TEXT NOT NULL DEFAULT 'AI receptionist for dental clinics'")
+        if not column_exists(db, "clinic_settings", "accent_color"):
+            db.execute("ALTER TABLE clinic_settings ADD COLUMN accent_color TEXT NOT NULL DEFAULT '#146c78'")
+        if not column_exists(db, "clinic_settings", "logo_text"):
+            db.execute("ALTER TABLE clinic_settings ADD COLUMN logo_text TEXT NOT NULL DEFAULT 'DV'")
+        if not column_exists(db, "clinic_settings", "admin_username"):
+            db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_username TEXT NOT NULL DEFAULT 'admin'")
+        if not column_exists(db, "clinic_settings", "admin_password"):
+            db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_password TEXT NOT NULL DEFAULT 'dentvoice123'")
 
         existing_settings = db.execute("SELECT COUNT(*) AS count FROM clinic_settings").fetchone()["count"]
         if existing_settings == 0:
             db.execute(
                 """
-                INSERT INTO clinic_settings (id, clinic_name, clinic_timings, clinic_address)
-                VALUES (1, ?, ?, ?)
+                INSERT INTO clinic_settings (
+                    id, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, admin_username, admin_password
+                )
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                ("Smile Dental Clinic", "Monday to Saturday, 9 AM to 8 PM", "Near the main market with parking available"),
+                (
+                    "Smile Dental Clinic",
+                    "Monday to Saturday, 9 AM to 8 PM",
+                    "Near the main market with parking available",
+                    "AI receptionist for dental clinics",
+                    "#146c78",
+                    "DV",
+                    "admin",
+                    "dentvoice123",
+                ),
             )
 
         existing_slots = db.execute("SELECT COUNT(*) AS count FROM slots").fetchone()["count"]
@@ -251,7 +292,13 @@ def reset_slots_if_outdated(db: sqlite3.Connection) -> None:
 
 def fetch_clinic_settings() -> dict[str, str]:
     with get_db() as db:
-        row = db.execute("SELECT clinic_name, clinic_timings, clinic_address FROM clinic_settings WHERE id = 1").fetchone()
+        row = db.execute(
+            """
+            SELECT clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, admin_username, admin_password
+            FROM clinic_settings
+            WHERE id = 1
+            """
+        ).fetchone()
         return dict(row)
 
 
@@ -397,6 +444,35 @@ def fetch_audit_logs(limit: int = 50) -> list[dict[str, str]]:
         return [dict(row) for row in rows]
 
 
+def fetch_receptionist_tasks(limit: int = 100, status: str = "") -> list[dict[str, str]]:
+    conditions: list[str] = []
+    params: list[object] = []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    query = f"""
+        SELECT id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at
+        FROM receptionist_tasks
+        {where_clause}
+        ORDER BY
+            CASE status
+                WHEN 'open' THEN 1
+                WHEN 'in_progress' THEN 2
+                ELSE 3
+            END,
+            due_date ASC,
+            datetime(created_at) DESC
+        LIMIT ?
+    """
+    params.append(limit)
+
+    with get_db() as db:
+        rows = db.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+
 def fetch_patient_profiles(limit: int = 200, search: str = "") -> list[dict[str, object]]:
     appointments = fetch_appointments(limit=1000)
     grouped: dict[str, list[AppointmentRequest]] = defaultdict(list)
@@ -449,11 +525,13 @@ def fetch_analytics() -> dict[str, object]:
     calls = fetch_call_records(limit=1000)
     messages = fetch_messages(limit=1000)
     contacts = fetch_contact_requests(limit=1000)
+    tasks = fetch_receptionist_tasks(limit=1000)
 
     appointments_by_status = Counter(item.status for item in appointments)
     appointments_by_source = Counter(item.source for item in appointments)
     calls_by_intent = Counter(item.intent for item in calls)
     calls_by_lead_score = Counter(item.lead_score for item in calls)
+    tasks_by_status = Counter(item["status"] for item in tasks)
 
     recent_days: list[dict[str, object]] = []
     today = datetime.now(UTC).date()
@@ -477,13 +555,52 @@ def fetch_analytics() -> dict[str, object]:
             "emergencies": sum(1 for item in calls if item.urgent),
             "contacts": len(contacts),
             "patients": len(fetch_patient_profiles(limit=1000)),
+            "open_tasks": sum(1 for item in tasks if item["status"] != "done"),
         },
         "appointments_by_status": dict(appointments_by_status),
         "appointments_by_source": dict(appointments_by_source),
         "calls_by_intent": dict(calls_by_intent),
         "calls_by_lead_score": dict(calls_by_lead_score),
+        "tasks_by_status": dict(tasks_by_status),
         "recent_days": recent_days,
+        "conversion_rate": round((len(appointments) / len(calls)) * 100, 1) if calls else 0.0,
+        "completion_rate": round((appointments_by_status.get("completed", 0) / len(appointments)) * 100, 1) if appointments else 0.0,
+        "hot_lead_rate": round((calls_by_lead_score.get("hot", 0) / len(calls)) * 100, 1) if calls else 0.0,
     }
+
+
+def build_chart(counter_map: dict[str, int]) -> list[dict[str, object]]:
+    if not counter_map:
+        return []
+
+    peak = max(counter_map.values()) or 1
+    rows = []
+    for label, value in counter_map.items():
+        rows.append(
+            {
+                "label": label.replace("_", " ").title(),
+                "value": value,
+                "percent": round((value / peak) * 100, 1),
+            }
+        )
+    return rows
+
+
+def build_trend_chart(days: list[dict[str, object]]) -> list[dict[str, object]]:
+    peak = max((max(int(item["appointments"]), int(item["calls"]), int(item["contacts"])) for item in days), default=1)
+    peak = peak or 1
+    return [
+        {
+            "date": item["date"],
+            "appointments": item["appointments"],
+            "calls": item["calls"],
+            "contacts": item["contacts"],
+            "appointment_percent": round((int(item["appointments"]) / peak) * 100, 1),
+            "call_percent": round((int(item["calls"]) / peak) * 100, 1),
+            "contact_percent": round((int(item["contacts"]) / peak) * 100, 1),
+        }
+        for item in days
+    ]
 
 
 def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str) -> None:
@@ -496,6 +613,38 @@ def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str
             (action, entity_type, entity_id, summary, datetime.now(UTC).isoformat()),
         )
         db.commit()
+
+
+def is_authenticated(request: Request) -> bool:
+    return bool(request.session.get("dentvoice_authenticated"))
+
+
+def require_authenticated_page(request: Request) -> RedirectResponse | None:
+    if is_authenticated(request):
+        return None
+    return RedirectResponse(url=f"/login?next={request.url.path}", status_code=303)
+
+
+def require_authenticated_api(request: Request) -> None:
+    if not is_authenticated(request):
+        raise HTTPException(status_code=401, detail="Please log in to continue.")
+
+
+def valid_hex_color(value: str) -> bool:
+    if len(value) != 7 or not value.startswith("#"):
+        return False
+    return all(character in "0123456789abcdefABCDEF" for character in value[1:])
+
+
+def normalize_branding(settings: dict[str, str]) -> dict[str, str]:
+    accent = settings.get("accent_color", "#146c78")
+    if not valid_hex_color(accent):
+        accent = "#146c78"
+    return {
+        "logo_text": (settings.get("logo_text") or "DV")[:4],
+        "brand_tagline": settings.get("brand_tagline") or "AI receptionist for dental clinics",
+        "accent_color": accent,
+    }
 
 
 def check_double_booking(preferred_date: str, preferred_time: str, *, exclude_appointment_id: str | None = None) -> None:
@@ -729,6 +878,8 @@ def slot_prompt() -> str:
 
 def build_dashboard_context() -> dict[str, object]:
     analytics = fetch_analytics()
+    settings = fetch_clinic_settings()
+    branding = normalize_branding(settings)
     return {
         "stats": analytics["totals"],
         "appointments": fetch_appointments(limit=10),
@@ -736,14 +887,26 @@ def build_dashboard_context() -> dict[str, object]:
         "messages": fetch_messages(limit=10),
         "contact_requests": fetch_contact_requests(limit=5),
         "audit_logs": fetch_audit_logs(limit=8),
+        "receptionist_tasks": fetch_receptionist_tasks(limit=8),
         "calendar_entries": fetch_calendar_entries()[:5],
         "patient_profiles": fetch_patient_profiles(limit=5),
         "faqs": FAQS,
         "slots": fetch_slots(),
-        "settings": fetch_clinic_settings(),
+        "settings": settings,
+        "branding": branding,
         "analytics": analytics,
+        "analytics_charts": {
+            "appointments_by_status": build_chart(analytics["appointments_by_status"]),
+            "appointments_by_source": build_chart(analytics["appointments_by_source"]),
+            "calls_by_intent": build_chart(analytics["calls_by_intent"]),
+            "calls_by_lead_score": build_chart(analytics["calls_by_lead_score"]),
+            "tasks_by_status": build_chart(analytics["tasks_by_status"]),
+            "recent_days": build_trend_chart(analytics["recent_days"]),
+        },
         "statuses": APPOINTMENT_STATUSES,
         "lead_scores": LEAD_SCORES,
+        "task_statuses": TASK_STATUSES,
+        "default_admin_username": settings.get("admin_username", "admin"),
     }
 
 
@@ -764,12 +927,48 @@ init_db()
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "landing.html", build_dashboard_context())
+    context = build_dashboard_context()
+    context.update({"is_authenticated": is_authenticated(request)})
+    return templates.TemplateResponse(request, "landing.html", context)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, next: str = Query(default="/dashboard"), error: str = Query(default="")) -> HTMLResponse:
+    if is_authenticated(request):
+        return RedirectResponse(url=next or "/dashboard", status_code=303)
+    context = build_dashboard_context()
+    context.update({"next_url": next, "login_error": error})
+    return templates.TemplateResponse(request, "login.html", context)
+
+
+@app.post("/login")
+async def login_submit(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    next_url: str = Form(default="/dashboard"),
+) -> Response:
+    settings = fetch_clinic_settings()
+    if username == settings["admin_username"] and password == settings["admin_password"]:
+        request.session["dentvoice_authenticated"] = True
+        return RedirectResponse(url=next_url or "/dashboard", status_code=303)
+    return RedirectResponse(url=f"/login?next={next_url or '/dashboard'}&error=Invalid credentials", status_code=303)
+
+
+@app.post("/logout")
+async def logout(request: Request) -> RedirectResponse:
+    request.session.clear()
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "dashboard.html", build_dashboard_context())
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    context = build_dashboard_context()
+    context.update({"is_authenticated": True})
+    return templates.TemplateResponse(request, "dashboard.html", context)
 
 
 @app.get("/appointments", response_class=HTMLResponse)
@@ -780,12 +979,16 @@ async def appointments_page(
     source: str = Query(default=""),
     preferred_date: str = Query(default=""),
 ) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
     context.update(
         {
             "page_title": "Appointments",
             "appointments": fetch_appointments(limit=200, search=q, status=status, source=source, preferred_date=preferred_date),
             "filters": {"q": q, "status": status, "source": source, "preferred_date": preferred_date},
+            "is_authenticated": True,
         }
     )
     return templates.TemplateResponse(request, "appointments.html", context)
@@ -799,6 +1002,9 @@ async def calls_page(
     urgent_only: bool = Query(default=False),
     lead_score: str = Query(default=""),
 ) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
     context.update(
         {
@@ -806,6 +1012,7 @@ async def calls_page(
             "call_records": fetch_call_records(limit=200, search=q, intent=intent, urgent_only=urgent_only, lead_score=lead_score),
             "filters": {"q": q, "intent": intent, "urgent_only": urgent_only, "lead_score": lead_score},
             "call_intents": CALL_INTENTS,
+            "is_authenticated": True,
         }
     )
     return templates.TemplateResponse(request, "calls.html", context)
@@ -813,36 +1020,51 @@ async def calls_page(
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
-    context.update({"page_title": "Analytics"})
+    context.update({"page_title": "Analytics", "is_authenticated": True})
     return templates.TemplateResponse(request, "analytics.html", context)
 
 
 @app.get("/docs", response_class=HTMLResponse)
 async def docs_page(request: Request) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
-    context.update({"page_title": "Docs"})
+    context.update({"page_title": "Docs", "is_authenticated": True})
     return templates.TemplateResponse(request, "docs.html", context)
 
 
 @app.get("/calendar", response_class=HTMLResponse)
 async def calendar_page(request: Request) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
-    context.update({"page_title": "Calendar", "calendar_entries": fetch_calendar_entries()})
+    context.update({"page_title": "Calendar", "calendar_entries": fetch_calendar_entries(), "is_authenticated": True})
     return templates.TemplateResponse(request, "calendar.html", context)
 
 
 @app.get("/patients", response_class=HTMLResponse)
 async def patients_page(request: Request, q: str = Query(default="")) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
-    context.update({"page_title": "Patients", "patient_profiles": fetch_patient_profiles(limit=300, search=q), "filters": {"q": q}})
+    context.update({"page_title": "Patients", "patient_profiles": fetch_patient_profiles(limit=300, search=q), "filters": {"q": q}, "is_authenticated": True})
     return templates.TemplateResponse(request, "patients.html", context)
 
 
 @app.get("/audit", response_class=HTMLResponse)
 async def audit_page(request: Request) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
     context = build_dashboard_context()
-    context.update({"page_title": "Audit Log", "audit_logs": fetch_audit_logs(limit=200)})
+    context.update({"page_title": "Audit Log", "audit_logs": fetch_audit_logs(limit=200), "is_authenticated": True})
     return templates.TemplateResponse(request, "audit.html", context)
 
 
@@ -852,7 +1074,8 @@ async def healthcheck() -> JSONResponse:
 
 
 @app.get("/api/dashboard")
-async def dashboard_data() -> JSONResponse:
+async def dashboard_data(request: Request) -> JSONResponse:
+    require_authenticated_api(request)
     context = build_dashboard_context()
     return JSONResponse(
         {
@@ -944,6 +1167,7 @@ async def create_appointment(appointment: AppointmentRequest) -> JSONResponse:
 
 @app.post("/api/admin/appointments")
 async def create_admin_appointment(
+    request: Request,
     patient_name: str = Form(...),
     phone_number: str = Form(...),
     preferred_date: str = Form(...),
@@ -952,6 +1176,7 @@ async def create_admin_appointment(
     status: str = Form(default="confirmed"),
     notes: str = Form(default=""),
 ) -> JSONResponse:
+    require_authenticated_api(request)
     stored = create_appointment_record(
         patient_name=patient_name,
         phone_number=phone_number,
@@ -966,7 +1191,8 @@ async def create_admin_appointment(
 
 
 @app.post("/api/appointments/{appointment_id}/status")
-async def update_appointment_status(appointment_id: str, status: str = Form(...)) -> JSONResponse:
+async def update_appointment_status(request: Request, appointment_id: str, status: str = Form(...)) -> JSONResponse:
+    require_authenticated_api(request)
     with get_db() as db:
         result = db.execute("UPDATE appointments SET status = ? WHERE id = ?", (status, appointment_id))
         db.commit()
@@ -978,6 +1204,7 @@ async def update_appointment_status(appointment_id: str, status: str = Form(...)
 
 @app.post("/api/appointments/{appointment_id}/update")
 async def update_appointment(
+    request: Request,
     appointment_id: str,
     patient_name: str = Form(...),
     phone_number: str = Form(...),
@@ -987,6 +1214,7 @@ async def update_appointment(
     status: str = Form(...),
     notes: str = Form(default=""),
 ) -> JSONResponse:
+    require_authenticated_api(request)
     check_double_booking(preferred_date, preferred_time, exclude_appointment_id=appointment_id)
     with get_db() as db:
         result = db.execute(
@@ -1005,7 +1233,8 @@ async def update_appointment(
 
 
 @app.post("/api/appointments/{appointment_id}/delete")
-async def delete_appointment(appointment_id: str) -> JSONResponse:
+async def delete_appointment(request: Request, appointment_id: str) -> JSONResponse:
+    require_authenticated_api(request)
     with get_db() as db:
         result = db.execute("DELETE FROM appointments WHERE id = ?", (appointment_id,))
         db.commit()
@@ -1016,7 +1245,8 @@ async def delete_appointment(appointment_id: str) -> JSONResponse:
 
 
 @app.post("/api/calls/{call_id}/lead-score")
-async def update_call_lead_score(call_id: str, lead_score: str = Form(...)) -> JSONResponse:
+async def update_call_lead_score(request: Request, call_id: str, lead_score: str = Form(...)) -> JSONResponse:
+    require_authenticated_api(request)
     with get_db() as db:
         result = db.execute("UPDATE call_records SET lead_score = ? WHERE id = ?", (lead_score, call_id))
         db.commit()
@@ -1027,7 +1257,8 @@ async def update_call_lead_score(call_id: str, lead_score: str = Form(...)) -> J
 
 
 @app.post("/api/slots")
-async def create_slot(slot: SlotInput) -> JSONResponse:
+async def create_slot(request: Request, slot: SlotInput) -> JSONResponse:
+    require_authenticated_api(request)
     with get_db() as db:
         db.execute("INSERT INTO slots (slot_date, slot_time) VALUES (?, ?)", (slot.date, slot.time))
         db.commit()
@@ -1036,7 +1267,8 @@ async def create_slot(slot: SlotInput) -> JSONResponse:
 
 
 @app.post("/api/slots/{slot_id}/delete")
-async def delete_slot(slot_id: int) -> JSONResponse:
+async def delete_slot(request: Request, slot_id: int) -> JSONResponse:
+    require_authenticated_api(request)
     with get_db() as db:
         result = db.execute("DELETE FROM slots WHERE id = ?", (slot_id,))
         db.commit()
@@ -1047,23 +1279,95 @@ async def delete_slot(slot_id: int) -> JSONResponse:
 
 
 @app.post("/api/settings")
-async def update_settings(payload: ClinicSettingsInput) -> JSONResponse:
+async def update_settings(request: Request, payload: ClinicSettingsInput) -> JSONResponse:
+    require_authenticated_api(request)
+    if not valid_hex_color(payload.accent_color):
+        raise HTTPException(status_code=400, detail="Accent color must be a valid hex value like #146c78.")
     with get_db() as db:
         db.execute(
             """
             UPDATE clinic_settings
-            SET clinic_name = ?, clinic_timings = ?, clinic_address = ?
+            SET clinic_name = ?, clinic_timings = ?, clinic_address = ?, brand_tagline = ?, accent_color = ?, logo_text = ?, admin_username = ?, admin_password = ?
             WHERE id = 1
             """,
-            (payload.clinic_name, payload.clinic_timings, payload.clinic_address),
+            (
+                payload.clinic_name,
+                payload.clinic_timings,
+                payload.clinic_address,
+                payload.brand_tagline,
+                payload.accent_color,
+                payload.logo_text,
+                payload.admin_username,
+                payload.admin_password,
+            ),
         )
         db.commit()
     log_audit("update", "clinic_settings", "1", "Updated clinic settings.")
     return JSONResponse({"message": "Clinic settings updated", "settings": fetch_clinic_settings()})
 
 
+@app.post("/api/receptionist-tasks")
+async def create_receptionist_task(
+    request: Request,
+    patient_name: str = Form(...),
+    phone_number: str = Form(...),
+    note: str = Form(...),
+    due_date: str = Form(...),
+    status: str = Form(default="open"),
+    related_appointment_id: str = Form(default=""),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    task_id = str(uuid4())
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, related_appointment_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task_id,
+                patient_name,
+                phone_number,
+                note,
+                due_date,
+                status,
+                related_appointment_id or None,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        db.commit()
+    log_audit("create", "receptionist_task", task_id, f"Created follow-up task for {patient_name}.")
+    return JSONResponse({"message": "Receptionist task created"})
+
+
+@app.post("/api/receptionist-tasks/{task_id}/update")
+async def update_receptionist_task(
+    request: Request,
+    task_id: str,
+    note: str = Form(...),
+    due_date: str = Form(...),
+    status: str = Form(...),
+) -> JSONResponse:
+    require_authenticated_api(request)
+    with get_db() as db:
+        result = db.execute(
+            """
+            UPDATE receptionist_tasks
+            SET note = ?, due_date = ?, status = ?
+            WHERE id = ?
+            """,
+            (note, due_date, status, task_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Receptionist task not found")
+    log_audit("update", "receptionist_task", task_id, f"Updated receptionist task to {status}.")
+    return JSONResponse({"message": "Receptionist task updated"})
+
+
 @app.get("/api/export/appointments.csv")
-async def export_appointments_csv() -> StreamingResponse:
+async def export_appointments_csv(request: Request) -> StreamingResponse:
+    require_authenticated_api(request)
     appointments = fetch_appointments(limit=1000)
     rows = [item.model_dump() for item in appointments]
     return csv_response(
@@ -1074,7 +1378,8 @@ async def export_appointments_csv() -> StreamingResponse:
 
 
 @app.get("/api/export/calls.csv")
-async def export_calls_csv() -> StreamingResponse:
+async def export_calls_csv(request: Request) -> StreamingResponse:
+    require_authenticated_api(request)
     calls = fetch_call_records(limit=1000)
     rows = [
         {

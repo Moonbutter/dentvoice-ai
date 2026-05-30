@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
     <section class="hero compact-hero">
       <div>
@@ -19,6 +19,7 @@
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/">Landing</a>
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
+        <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
 
@@ -29,6 +30,7 @@
           <ul class="faq-list">
             <li><strong>/</strong><span>Public landing page</span></li>
             <li><strong>/dashboard</strong><span>Clinic admin overview</span></li>
+            <li><strong>/login</strong><span>Free local authentication for admin access</span></li>
             <li><strong>/appointments</strong><span>Appointment management with filters, notes, and delete/edit</span></li>
             <li><strong>/calls</strong><span>Call records with lead scoring</span></li>
             <li><strong>/analytics</strong><span>Free operational analytics</span></li>
@@ -58,12 +60,14 @@
         <div class="panel-body">
           <ul class="faq-list">
             <li><strong>Persistent storage</strong><span>SQLite stores appointments, slots, calls, settings, and notes.</span></li>
+            <li><strong>Authentication and branding</strong><span>Admin pages support local login, custom logo text, clinic tagline, and accent color.</span></li>
             <li><strong>Search and filters</strong><span>Dedicated operational pages help staff review activity faster.</span></li>
+            <li><strong>Saved filters and onboarding</strong><span>Staff can keep favorite filter views in the browser and learn the product with guided walkthroughs.</span></li>
             <li><strong>Edit and delete workflows</strong><span>Appointments can be updated, annotated, or removed.</span></li>
             <li><strong>Lead prioritization</strong><span>Calls can be categorized with free lead scoring logic.</span></li>
-            <li><strong>Analytics and exports</strong><span>Product usage can be tracked without external analytics tools.</span></li>
+            <li><strong>Analytics and exports</strong><span>Visual charts, KPI cards, and CSV exports work without external analytics tools.</span></li>
             <li><strong>Calendar and patient views</strong><span>Staff can review upcoming days and repeat-patient history.</span></li>
-            <li><strong>Demo request capture and audit log</strong><span>Landing-page leads and product changes are both tracked.</span></li>
+            <li><strong>Demo request capture, receptionist tasks, and audit log</strong><span>Landing-page leads, manual follow-up work, and product changes are all tracked.</span></li>
           </ul>
         </div>
       </article>

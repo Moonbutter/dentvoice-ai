@@ -9,15 +9,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body style="--accent: {{ branding.accent_color }};">
   <main class="landing-shell">
     <section class="landing-hero">
       <div class="landing-copy">
+        <div class="brand-lockup">
+          <div class="logo-badge">{{ branding.logo_text }}</div>
+          <div>
         <p class="eyebrow">Voice AI for Dental Clinics</p>
         <h1>DentVoice AI answers calls, captures appointments, and keeps your front desk moving.</h1>
-        <p class="hero-copy">A 24/7 AI receptionist built for Indian dental clinics. It handles inbound calls, supports appointment booking, flags urgent cases, and gives your team a live operating dashboard.</p>
+          </div>
+        </div>
+        <p class="hero-copy">{{ branding.brand_tagline }}. A 24/7 AI receptionist built for Indian dental clinics. It handles inbound calls, supports appointment booking, flags urgent cases, and gives your team a live operating dashboard.</p>
         <div class="hero-actions">
-          <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+          {% if is_authenticated %}
+            <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+          {% else %}
+            <a class="primary-button link-button" href="/login">Clinic Login</a>
+          {% endif %}
           <a class="secondary-button link-button" href="/calendar">View Calendar</a>
           <a class="secondary-button link-button" href="/patients">Patient Profiles</a>
           <a class="secondary-button link-button" href="https://github.com/Moonbutter/dentvoice-ai">View GitHub</a>
@@ -37,7 +46,7 @@
           <li>Editable clinic settings and booking slots</li>
           <li>CSV export for operations tracking</li>
           <li>Twilio-compatible voice webhook flow</li>
-          <li>Calendar, patient profiles, analytics, and audit logs</li>
+          <li>Calendar, patient profiles, analytics, audit logs, onboarding, and local login</li>
         </ul>
       </div>
     </section>
@@ -52,7 +61,7 @@
           <ul class="faq-list">
             <li><strong>Appointment capture</strong><span>Patients can move through a booking flow and get structured follow-up.</span></li>
             <li><strong>Urgent case routing</strong><span>Emergency-style calls are highlighted for fast human review.</span></li>
-            <li><strong>Clinic operations view</strong><span>The dashboard tracks appointments, calls, messages, slot availability, and demo requests.</span></li>
+            <li><strong>Clinic operations view</strong><span>The dashboard tracks appointments, calls, messages, slot availability, receptionist tasks, and demo requests.</span></li>
           </ul>
         </div>
       </article>
@@ -65,6 +74,7 @@
         <div class="panel-body">
           <ul class="faq-list">
             <li><strong>Dashboard</strong><span><a href="/dashboard">/dashboard</a></span></li>
+            <li><strong>Login</strong><span><a href="/login">/login</a></span></li>
             <li><strong>Health check</strong><span><a href="/health">/health</a></span></li>
             <li><strong>GitHub repository</strong><span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span></li>
             <li><strong>Product docs</strong><span><a href="/docs">/docs</a></span></li>
@@ -119,6 +129,29 @@
           </form>
         </div>
       </article>
+    </section>
+
+    <section id="onboarding-modal" class="onboarding-modal" data-onboarding="landing" hidden>
+      <div class="onboarding-card">
+        <p class="eyebrow">Product Tour</p>
+        <h2>What you can explore in this demo.</h2>
+        <div class="onboarding-step is-active">
+          <strong>1. View the product story</strong>
+          <span>The landing page shows the clinic problem, product value, and live demo links.</span>
+        </div>
+        <div class="onboarding-step">
+          <strong>2. Log in to the admin side</strong>
+          <span>Use the free local login to access the dashboard and management pages.</span>
+        </div>
+        <div class="onboarding-step">
+          <strong>3. Follow the workflow pages</strong>
+          <span>Appointments, calls, calendar, patients, audit, and analytics all work together.</span>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="secondary-button" id="skip-onboarding">Skip</button>
+          <button type="button" class="primary-button" id="next-onboarding">Next</button>
+        </div>
+      </div>
     </section>
 
     <div id="toast" class="toast" hidden></div>

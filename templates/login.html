@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell auth-shell">
+    <section class="panel auth-panel">
+      <div class="panel-header">
+        <div class="brand-lockup">
+          <div class="logo-badge">{{ branding.logo_text }}</div>
+          <div>
+            <p class="eyebrow">Clinic Admin Access</p>
+            <h1>DentVoice AI Login</h1>
+          </div>
+        </div>
+        <p>{{ branding.brand_tagline }}</p>
+      </div>
+      <div class="panel-body">
+        {% if login_error %}
+          <p class="auth-error">{{ login_error }}</p>
+        {% endif %}
+        <form method="post" action="/login" class="stack-form">
+          <input type="hidden" name="next_url" value="{{ next_url }}">
+          <label><span>Username</span><input name="username" required></label>
+          <label><span>Password</span><input type="password" name="password" required></label>
+          <button type="submit" class="primary-button">Log In</button>
+        </form>
+        <div class="auth-help">
+          <strong>Default local login</strong>
+          <span>Username: {{ default_admin_username }}</span>
+          <span>Password: dentvoice123</span>
+          <span>You can change both from the dashboard after logging in.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

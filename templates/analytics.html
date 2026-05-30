@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
     <section class="hero compact-hero">
       <div>
@@ -20,6 +20,7 @@
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/appointments">Appointments</a>
         <a class="secondary-button link-button" href="/calls">Calls</a>
+        <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
     </section>
 
@@ -30,34 +31,80 @@
       <article class="stat-card"><span class="stat-label">Messages</span><strong class="stat-value">{{ analytics.totals.messages }}</strong></article>
     </section>
 
+    <section class="kpi-strip analytics-kpis">
+      <div><strong>{{ analytics.conversion_rate }}%</strong><span>Call to booking rate</span></div>
+      <div><strong>{{ analytics.completion_rate }}%</strong><span>Completed appointment rate</span></div>
+      <div><strong>{{ analytics.hot_lead_rate }}%</strong><span>Hot lead share</span></div>
+      <div><strong>{{ analytics.totals.open_tasks }}</strong><span>Open receptionist tasks</span></div>
+    </section>
+
     <section class="content-grid">
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Status</h2><p>Operational state of saved bookings</p></div>
-        <div class="panel-body"><div class="mini-metrics">{% for key, value in analytics.appointments_by_status.items() %}<div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.replace("_", " ").title() }}</span></div>{% endfor %}</div></div>
+        <div class="panel-body">
+          <div class="chart-stack">
+            {% for item in analytics_charts.appointments_by_status %}
+              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Source</h2><p>Where bookings are coming from</p></div>
-        <div class="panel-body"><div class="mini-metrics">{% for key, value in analytics.appointments_by_source.items() %}<div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.replace("_", " ").title() }}</span></div>{% endfor %}</div></div>
+        <div class="panel-body">
+          <div class="chart-stack">
+            {% for item in analytics_charts.appointments_by_source %}
+              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Calls by Intent</h2><p>Why patients are reaching the clinic</p></div>
-        <div class="panel-body"><div class="mini-metrics">{% for key, value in analytics.calls_by_intent.items() %}<div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.replace("_", " ").title() }}</span></div>{% endfor %}</div></div>
+        <div class="panel-body">
+          <div class="chart-stack">
+            {% for item in analytics_charts.calls_by_intent %}
+              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
       </article>
       <article class="panel">
         <div class="panel-header"><h2>Lead Scores</h2><p>How urgently the team should act</p></div>
-        <div class="panel-body"><div class="mini-metrics">{% for key, value in analytics.calls_by_lead_score.items() %}<div class="mini-metric"><strong>{{ value }}</strong><span>{{ key.title() }}</span></div>{% endfor %}</div></div>
+        <div class="panel-body">
+          <div class="chart-stack">
+            {% for item in analytics_charts.calls_by_lead_score %}
+              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Receptionist Tasks</h2><p>Manual workflow still happening alongside AI</p></div>
+        <div class="panel-body">
+          <div class="chart-stack">
+            {% for item in analytics_charts.tasks_by_status %}
+              <div class="chart-row"><span>{{ item.label }}</span><div class="chart-bar"><i style="width: {{ item.percent }}%"></i></div><strong>{{ item.value }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
       </article>
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Last 7 Days</h2><p>Simple activity trend without paid analytics tools</p></div>
         <div class="panel-body">
-          <ul class="faq-list">
-            {% for item in analytics.recent_days %}
-              <li>
-                <strong>{{ item.date }}</strong>
-                <span>{{ item.appointments }} appointments, {{ item.calls }} calls</span>
-              </li>
+          <div class="trend-chart">
+            {% for item in analytics_charts.recent_days %}
+              <div class="trend-day">
+                <div class="trend-bars">
+                  <i class="trend-bar appointments" style="height: {{ item.appointment_percent }}%"></i>
+                  <i class="trend-bar calls" style="height: {{ item.call_percent }}%"></i>
+                  <i class="trend-bar contacts" style="height: {{ item.contact_percent }}%"></i>
+                </div>
+                <strong>{{ item.date[5:] }}</strong>
+                <span>{{ item.appointments }} A / {{ item.calls }} C / {{ item.contacts }} D</span>
+              </div>
             {% endfor %}
-          </ul>
+          </div>
         </div>
       </article>
     </section>
