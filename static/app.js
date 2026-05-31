@@ -440,6 +440,9 @@ document.getElementById("settings-form")?.addEventListener("submit", async (even
       logo_text: form.logo_text.value,
       business_type: form.business_type.value,
       avg_booking_value: Number(form.avg_booking_value.value || 0),
+      white_label_enabled: form.white_label_enabled?.checked || false,
+      white_label_name: form.white_label_name?.value || "",
+      reseller_code: form.reseller_code?.value || "",
       working_days: form.working_days.value,
       working_hours: form.working_hours.value,
       auto_callback_enabled: form.auto_callback_enabled.checked,
@@ -522,6 +525,159 @@ document.querySelectorAll(".call-score-form").forEach((form) => {
       const formData = new FormData(form);
       await postForm(`/api/calls/${form.dataset.callId}/update`, formData);
       refreshPage("Call record updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.getElementById("team-user-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/team/users", formData);
+    refreshPage("Team user created");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.querySelectorAll(".team-user-edit-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/team/users/${form.dataset.userId}/update`, formData);
+      refreshPage("Team user updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.getElementById("password-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/password/change", formData);
+    refreshPage("Password updated");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.querySelectorAll(".notification-read").forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      await postForm(`/api/notifications/${button.dataset.notificationId}/read`, new FormData());
+      refreshPage("Notification marked as read");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.getElementById("referral-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/referrals", formData);
+    refreshPage("Referral added");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("onboarding-email-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/onboarding-emails", formData);
+    refreshPage("Onboarding email queued");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.querySelectorAll(".comment-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      formData.set("entity_type", form.dataset.entityType);
+      formData.set("entity_id", form.dataset.entityId);
+      await postForm("/api/comments", formData);
+      refreshPage("Comment added");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+let draggedLeadId = null;
+document.querySelectorAll(".draggable-lead").forEach((card) => {
+  card.addEventListener("dragstart", () => {
+    draggedLeadId = card.dataset.requestId;
+    card.classList.add("dragging");
+  });
+  card.addEventListener("dragend", () => {
+    draggedLeadId = null;
+    card.classList.remove("dragging");
+  });
+});
+
+document.querySelectorAll(".lead-stage-dropzone").forEach((column) => {
+  column.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    column.classList.add("drop-active");
+  });
+  column.addEventListener("dragleave", () => column.classList.remove("drop-active"));
+  column.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    column.classList.remove("drop-active");
+    if (!draggedLeadId) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.set("status", column.dataset.stage);
+      await postForm(`/api/contact-requests/${draggedLeadId}/stage`, formData);
+      refreshPage("Lead stage updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+let draggedAppointmentId = null;
+document.querySelectorAll(".draggable-appointment").forEach((item) => {
+  item.addEventListener("dragstart", () => {
+    draggedAppointmentId = item.dataset.appointmentId;
+    item.classList.add("dragging");
+  });
+  item.addEventListener("dragend", () => {
+    draggedAppointmentId = null;
+    item.classList.remove("dragging");
+  });
+});
+
+document.querySelectorAll(".calendar-dropzone").forEach((zone) => {
+  zone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    zone.classList.add("drop-active");
+  });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drop-active"));
+  zone.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    zone.classList.remove("drop-active");
+    if (!draggedAppointmentId) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.set("preferred_date", zone.dataset.date);
+      await postForm(`/api/calendar/appointments/${draggedAppointmentId}/move`, formData);
+      refreshPage("Appointment moved");
     } catch (error) {
       showToast(error.message, "error");
     }

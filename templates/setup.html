@@ -132,6 +132,11 @@
               <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" placeholder="Mon,Tue,Wed,Thu,Fri,Sat" required></label>
               <label><span>Working hours</span><input name="working_hours" value="{{ settings.working_hours }}" placeholder="09:00-20:00" required></label>
             </div>
+            <div class="split-grid">
+              <label class="checkbox-row"><input type="checkbox" name="white_label_enabled" value="1" {% if settings.white_label_enabled %}checked{% endif %}> <span>Enable white-label mode</span></label>
+              <label><span>White-label brand name</span><input name="white_label_name" value="{{ settings.white_label_name }}" placeholder="SmileFlow AI"></label>
+            </div>
+            <label><span>Reseller code</span><input name="reseller_code" value="{{ settings.reseller_code }}" placeholder="mumbai-channel-01"></label>
             <label class="checkbox-row"><input type="checkbox" name="auto_callback_enabled" value="1" {% if settings.auto_callback_enabled %}checked{% endif %}> <span>Auto-create callback tasks for missed high-intent leads</span></label>
             <button type="submit" class="primary-button">Save Settings</button>
           </form>
@@ -195,6 +200,7 @@
             <li><strong>Admin dashboard</strong><span><a href="/dashboard">/dashboard</a></span></li>
             <li><strong>Analytics</strong><span><a href="/analytics">/analytics</a></span></li>
             <li><strong>Exports</strong><span><a href="/exports">/exports</a></span></li>
+            <li><strong>Case-study pages</strong><span><a href="/solutions/{{ settings.business_type }}">/solutions/{{ settings.business_type }}</a></span></li>
           </ul>
         </div>
       </article>

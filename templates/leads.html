@@ -39,12 +39,13 @@
             <h2>{{ status_name.replace("_", " ").title() }}</h2>
             <p>{{ lead_pipeline[status_name]|length }} leads in this stage</p>
           </div>
-          <div class="panel-body stack-list">
+          <div class="panel-body stack-list lead-stage-dropzone" data-stage="{{ status_name }}">
             {% for item in lead_pipeline[status_name][:5] %}
-              <div class="card-form">
+              <div class="card-form draggable-lead" draggable="true" data-request-id="{{ item.id }}">
                 <strong>{{ item.name }}</strong>
                 <span>{{ item.clinic_name }}</span>
                 <span class="muted-line">{{ item.phone_number }}</span>
+                {% if item.tags %}<span class="muted-line">Tags: {{ item.tags }}</span>{% endif %}
               </div>
             {% else %}
               <p class="empty-state">No leads here yet.</p>
@@ -72,9 +73,24 @@
               </div>
               <p class="message-paragraph">{{ item.message }}</p>
               <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+              <label><span>Tags</span><input name="tags" value="{{ item.tags }}" placeholder="dental, mumbai, premium, callback"></label>
               <label><span>Owner notes</span><textarea name="owner_notes" rows="4" placeholder="Called clinic manager, waiting for trial slot, send brochure tomorrow">{{ item.owner_notes }}</textarea></label>
               <button type="submit" class="primary-button">Update Lead</button>
             </form>
+            <div class="top-gap-inline">
+              <strong>Comment Thread</strong>
+              <ul class="faq-list top-gap-inline">
+                {% for comment in lead_comments[item.id] %}
+                  <li><div><strong>{{ comment.author_name }}</strong><span>{{ comment.body }}</span></div><div class="record-meta"><span>{{ comment.created_at[:16].replace("T", " ") }}</span></div></li>
+                {% else %}
+                  <li><div><span>No comments yet.</span></div></li>
+                {% endfor %}
+              </ul>
+              <form class="comment-form top-gap-inline" data-entity-type="lead" data-entity-id="{{ item.id }}">
+                <label><span>Add internal comment</span><textarea name="body" rows="2" placeholder="Call summary, objection, pricing note..." required></textarea></label>
+                <button type="submit" class="secondary-button">Add Comment</button>
+              </form>
+            </div>
           </div>
         </article>
       {% else %}

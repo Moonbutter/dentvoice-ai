@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ case_template.label }} - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ case_template.accent_color }};">
+  <main class="landing-shell">
+    <section class="landing-hero">
+      <div class="landing-copy">
+        <p class="eyebrow">{{ case_template.label }}</p>
+        <h1>DentVoice for {{ case_template.label.lower() }}.</h1>
+        <p class="hero-copy">{{ case_template.tagline }}. This page is a vertical-specific sales surface you can use for outreach, ads, or investor demos.</p>
+        <div class="hero-actions">
+          <a class="primary-button link-button" href="/#trial-signup">Start Free Workspace</a>
+          <a class="secondary-button link-button" href="/#pricing">View Pricing</a>
+        </div>
+      </div>
+      <div class="landing-card">
+        <p class="landing-card-label">Why this vertical fits</p>
+        <ul class="feature-list">
+          <li>Average booking value benchmark: ₹{{ case_template.avg_booking_value }}</li>
+          <li>Default hours: {{ case_template.timings_label }}</li>
+          <li>Workflow can be templated before paid integrations.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

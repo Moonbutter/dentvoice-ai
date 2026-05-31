@@ -20,6 +20,7 @@
       <div class="panel-body">
         <form method="get" action="/search" class="filter-grid short-filter-grid">
           <label><span>Search everything</span><input name="q" value="{{ search_query }}" placeholder="Patient, clinic, phone, note, FAQ topic"></label>
+          <label><span>Segment</span><select name="segment"><option value="">All segments</option>{% for item in search_segments %}<option value="{{ item }}" {% if search_segment == item %}selected{% endif %}>{{ item.replace("_", " ").title() }}</option>{% endfor %}</select></label>
           <button type="submit" class="primary-button">Search</button>
         </form>
       </div>

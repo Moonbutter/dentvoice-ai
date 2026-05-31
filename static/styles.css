@@ -379,6 +379,21 @@ button:hover,
   min-height: 240px;
 }
 
+.draggable-lead,
+.draggable-appointment {
+  cursor: grab;
+}
+
+.dragging {
+  opacity: 0.55;
+}
+
+.drop-active {
+  outline: 2px dashed rgba(20, 108, 120, 0.36);
+  outline-offset: 6px;
+  border-radius: 18px;
+}
+
 .filter-panel {
   margin-top: 22px;
 }
@@ -788,6 +803,19 @@ textarea {
 .empty-state {
   margin: 0;
   color: var(--muted);
+}
+
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(180, 35, 24, 0.1);
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .link-inline {

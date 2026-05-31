@@ -36,6 +36,20 @@ DentVoice AI is a lightweight MVP for an AI receptionist and revenue-recovery pl
 - Industry template library for dental, dermatology, physiotherapy, real estate, and salons
 - Revenue-recovered analytics and trial-to-paid growth tracking
 - Lead pipeline board for demo requests and SaaS conversion stages
+- White-label clinic mode for agencies and multi-clinic operators
+- Team management page with admin and receptionist user controls
+- Password change and reset flow for local auth
+- Notification center with read/unread state
+- Drag-and-drop lead pipeline stage updates
+- Drag-and-drop calendar rescheduling by day
+- Clinic benchmark reports and HQ dashboard
+- Referral and reseller workflow tracking
+- Smarter reports center with downloadable summary and benchmark CSVs
+- Internal comment threads for leads, tasks, and patients
+- Simulated onboarding email queue
+- Advanced search segmentation and tag-based workflows
+- Task SLA tracking and response-state visibility
+- Industry case-study pages for vertical sales conversations
 
 ## Project Structure
 
@@ -72,6 +86,12 @@ uvicorn app.main:app --reload
 - `GET /login` - Local clinic admin login
 - `GET /setup` - Admin workspace setup checklist
 - `GET /leads` - Demo request CRM and lead pipeline
+- `GET /team` - Team management and password controls
+- `GET /notifications` - Notification center
+- `GET /hq` - Franchise / multi-branch HQ dashboard
+- `GET /benchmarks` - Clinic benchmark reports
+- `GET /reports` - Summary reports and onboarding email queue
+- `GET /solutions/{business_type}` - Industry case-study landing pages
 - `GET /appointments` - Appointment management page
 - `GET /calls` - Call management page
 - `GET /analytics` - Analytics page
@@ -84,6 +104,8 @@ uvicorn app.main:app --reload
 - `GET /api/available-slots` - Available booking slots
 - `GET /api/export/appointments.csv` - Export appointments
 - `GET /api/export/calls.csv` - Export calls
+- `GET /api/export/summary.csv` - Export clinic summary report
+- `GET /api/export/benchmarks.csv` - Export network benchmark report
 - `POST /api/contact-request` - Save landing-page demo request
 - `POST /api/trial-signup` - Create a self-serve clinic workspace from the public site
 - `POST /api/simulate-call` - Simulate an inbound patient call
@@ -95,6 +117,14 @@ uvicorn app.main:app --reload
 - `POST /api/settings` - Update clinic settings
 - `POST /api/receptionist-tasks` - Create receptionist follow-up task
 - `POST /api/receptionist-tasks/{task_id}/update` - Update receptionist follow-up task
+- `POST /api/team/users` - Create a clinic user
+- `POST /api/team/users/{user_id}/update` - Update role, display name, or password
+- `POST /api/password/change` - Change the logged-in user's password
+- `POST /api/notifications/{notification_id}/read` - Mark a notification as read
+- `POST /api/referrals` - Create a referral / reseller lead
+- `POST /api/onboarding-emails` - Queue a simulated onboarding email
+- `POST /api/comments` - Add an internal comment to a patient, lead, or task
+- `POST /api/calendar/appointments/{appointment_id}/move` - Move an appointment to another day
 - `POST /api/slots` - Add booking slot
 - `POST /api/slots/{slot_id}/delete` - Remove booking slot
 - `POST /voice/incoming` - Twilio voice webhook

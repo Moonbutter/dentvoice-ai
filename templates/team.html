@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Team Management</p><h1>Manage users, roles, and passwords.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/notifications">Notifications</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>Add Team User</h2><p>Create admin or receptionist access</p></div>
+        <div class="panel-body">
+          <form id="team-user-form" class="stack-form">
+            <label><span>Username</span><input name="username" required></label>
+            <label><span>Display name</span><input name="display_name" required></label>
+            <div class="split-grid">
+              <label><span>Role</span><select name="role"><option value="admin">Admin</option><option value="receptionist">Receptionist</option></select></label>
+              <label><span>Password</span><input name="password" required></label>
+            </div>
+            <button type="submit" class="primary-button">Create User</button>
+          </form>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Change Your Password</h2><p>Free local auth credentials</p></div>
+        <div class="panel-body">
+          <form id="password-form" class="stack-form">
+            <label><span>Current password</span><input type="password" name="current_password" required></label>
+            <label><span>New password</span><input type="password" name="new_password" required></label>
+            <button type="submit" class="secondary-button">Update Password</button>
+          </form>
+        </div>
+      </article>
+    </section>
+    <section class="content-grid">
+      {% for user in team_users %}
+        <article class="panel">
+          <div class="panel-body">
+            <form class="team-user-edit-form stack-form card-form" data-user-id="{{ user.id }}">
+              <strong>{{ user.username }}</strong>
+              <span class="muted-line">{{ user.display_name }}</span>
+              <label><span>Display name</span><input name="display_name" value="{{ user.display_name }}" required></label>
+              <label><span>Role</span><select name="role"><option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option><option value="receptionist" {% if user.role == "receptionist" %}selected{% endif %}>Receptionist</option></select></label>
+              <label><span>Reset password</span><input name="password" placeholder="Leave empty to keep current"></label>
+              <button type="submit" class="primary-button">Save User</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

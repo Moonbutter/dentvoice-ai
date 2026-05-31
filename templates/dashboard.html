@@ -43,6 +43,11 @@
         <a class="secondary-button link-button" href="/leads">Leads</a>
         <a class="secondary-button link-button" href="/missed-leads">Missed Leads</a>
         <a class="secondary-button link-button" href="/search">Search</a>
+        <a class="secondary-button link-button" href="/notifications">Notifications{% if unread_notification_count %} ({{ unread_notification_count }}){% endif %}</a>
+        <a class="secondary-button link-button" href="/team">Team</a>
+        <a class="secondary-button link-button" href="/reports">Reports</a>
+        <a class="secondary-button link-button" href="/benchmarks">Benchmarks</a>
+        {% if current_role == "admin" %}<a class="secondary-button link-button" href="/hq">HQ</a>{% endif %}
         <a class="secondary-button link-button" href="/audit">Audit</a>
         <a class="secondary-button link-button" href="/exports">Exports</a>
         <a class="secondary-button link-button" href="/docs">Docs</a>
@@ -81,8 +86,13 @@
             </div>
             <div class="split-grid">
               <label><span>Working hours</span><input name="working_hours" value="09:00-20:00" required></label>
-              <div class="top-gap-inline"><span class="muted-line">Admin and receptionist logins are created automatically.</span></div>
+              <label><span>Reseller code</span><input name="reseller_code" placeholder="mumbai-channel-01"></label>
             </div>
+            <div class="split-grid">
+              <label class="checkbox-row"><input type="checkbox" name="white_label_enabled" value="true"><span>Enable white-label mode</span></label>
+              <label><span>White-label brand name</span><input name="white_label_name" placeholder="SmileFlow AI"></label>
+            </div>
+            <div class="top-gap-inline"><span class="muted-line">Admin and receptionist logins are created automatically.</span></div>
             <button type="submit" class="primary-button">Create Clinic Workspace</button>
           </form>
         </div>
@@ -158,6 +168,11 @@
               <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" required></label>
               <label><span>Working hours</span><input name="working_hours" value="{{ settings.working_hours }}" required></label>
             </div>
+            <div class="split-grid">
+              <label class="checkbox-row"><input type="checkbox" name="white_label_enabled" value="true" {% if settings.white_label_enabled %}checked{% endif %}><span>Enable white-label mode for agencies or groups</span></label>
+              <label><span>White-label brand name</span><input name="white_label_name" value="{{ settings.white_label_name }}"></label>
+            </div>
+            <label><span>Reseller code</span><input name="reseller_code" value="{{ settings.reseller_code }}" placeholder="mumbai-channel-01"></label>
             <label class="checkbox-row"><input type="checkbox" name="auto_callback_enabled" value="true" {% if settings.auto_callback_enabled %}checked{% endif %}><span>Auto-create callback tasks for missed high-intent calls</span></label>
             <button type="submit" class="primary-button">Update Settings</button>
           </form>

@@ -39,17 +39,33 @@
             <form class="task-edit-form task-card" data-task-id="{{ task.id }}">
               <div class="task-card-top">
                 <strong>{{ task.patient_name }}</strong>
-                <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
+              <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
               </div>
               <span class="muted-line">{{ task.phone_number }}</span>
+              <span class="muted-line">SLA: {{ task.sla_status.replace("_", " ").title() }}</span>
               <label><span>Follow-up note</span><textarea name="note" rows="4">{{ task.note }}</textarea></label>
               <div class="split-grid">
                 <label><span>Due date</span><input type="date" name="due_date" value="{{ task.due_date }}"></label>
                 <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if task.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
               </div>
               <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}" {% if task.priority == task_priority %}selected{% endif %}>{{ task_priority.title() }}</option>{% endfor %}</select></label>
+              <label><span>Tags</span><input name="tags" value="{{ task.tags }}" placeholder="callback, trial, urgent"></label>
               <button type="submit" class="primary-button">Save Task</button>
             </form>
+            <div class="top-gap-inline">
+              <strong>Comments</strong>
+              <ul class="faq-list top-gap-inline">
+                {% for comment in task_comments[task.id] %}
+                  <li><div><strong>{{ comment.author_name }}</strong><span>{{ comment.body }}</span></div><div class="record-meta"><span>{{ comment.created_at[:16].replace("T", " ") }}</span></div></li>
+                {% else %}
+                  <li><div><span>No comments yet.</span></div></li>
+                {% endfor %}
+              </ul>
+              <form class="comment-form top-gap-inline" data-entity-type="task" data-entity-id="{{ task.id }}">
+                <label><span>Add internal comment</span><textarea name="body" rows="2" placeholder="Left voicemail, confirmed callback window..." required></textarea></label>
+                <button type="submit" class="secondary-button">Add Comment</button>
+              </form>
+            </div>
           </div>
         </article>
       {% else %}

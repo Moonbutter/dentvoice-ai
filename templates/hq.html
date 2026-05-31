@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HQ Dashboard - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">HQ Dashboard</p><h1>Watch every clinic workspace like a franchise operating system.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/benchmarks">Benchmarks</a><a class="secondary-button link-button" href="/reports">Reports</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+    <section class="stats-grid">
+      <article class="stat-card"><span class="stat-label">Clinic Workspaces</span><strong class="stat-value">{{ clinics|length }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Estimated MRR</span><strong class="stat-value">₹{{ company_growth.estimated_mrr }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Active Trials</span><strong class="stat-value">{{ company_growth.active_trials }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Paid Accounts</span><strong class="stat-value">{{ company_growth.paid_accounts }}</strong></article>
+    </section>
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Clinic Network</h2><p>Branch-level overview for company operators</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for clinic in benchmark_report %}
+              <li>
+                <div><strong>{{ clinic.clinic_name }}</strong><span>{{ clinic.business_type }} · {{ clinic.appointments }} appointments · {{ clinic.calls }} calls</span></div>
+                <div class="record-meta"><span>{{ clinic.conversion_rate }}% conversion</span><span>₹{{ clinic.estimated_revenue_recovered }}</span></div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Referral and Reseller Flow</h2><p>Track partner-led expansion without paid tooling</p></div>
+        <div class="panel-body">
+          <form id="referral-form" class="stack-form">
+            <label><span>Referrer name</span><input name="referrer_name" required></label>
+            <label><span>Referrer phone</span><input name="referrer_phone" required></label>
+            <label><span>Referred business</span><input name="referred_business" required></label>
+            <label><span>Status</span><select name="status"><option value="new">New</option><option value="contacted">Contacted</option><option value="won">Won</option></select></label>
+            <label><span>Notes</span><textarea name="notes" rows="3"></textarea></label>
+            <button type="submit" class="primary-button">Add Referral</button>
+          </form>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Referral Log</h2><p>Simple reseller pipeline</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in referrals %}
+              <li><div><strong>{{ item.referred_business }}</strong><span>{{ item.referrer_name }} · {{ item.referrer_phone }}</span></div><div class="record-meta"><span class="pill">{{ item.status.replace("_"," ").title() }}</span></div></li>
+            {% else %}
+              <p class="empty-state">No referrals yet.</p>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

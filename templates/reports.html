@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Reports Center</p><h1>Download smarter summaries, not just raw CSV tables.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/exports">Exports</a><a class="secondary-button link-button" href="/analytics">Analytics</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>Clinic Summary</h2><p>Business-facing metrics for one workspace</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in report_summary %}
+              <li><strong>{{ item.metric }}</strong><span>{{ item.value }}</span></li>
+            {% endfor %}
+          </ul>
+          <a class="primary-button link-button top-gap-inline" href="/api/export/summary.csv">Download summary CSV</a>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Network Benchmarks</h2><p>Cross-clinic comparison for HQ or agencies</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in benchmark_report[:5] %}
+              <li><strong>{{ item.clinic_name }}</strong><span>{{ item.business_type }} · ₹{{ item.estimated_revenue_recovered }}</span></li>
+            {% endfor %}
+          </ul>
+          <a class="secondary-button link-button top-gap-inline" href="/api/export/benchmarks.csv">Download benchmarks CSV</a>
+        </div>
+      </article>
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Onboarding Email Queue</h2><p>Simulate customer success emails without paid email tools</p></div>
+        <div class="panel-body">
+          <form id="onboarding-email-form" class="stack-form card-form">
+            <label><span>Subject</span><input name="subject" required></label>
+            <label><span>Body</span><textarea name="body" rows="4" required></textarea></label>
+            <label><span>Status</span><select name="status"><option value="queued">Queued</option><option value="sent">Sent</option><option value="draft">Draft</option></select></label>
+            <button type="submit" class="primary-button">Queue Email</button>
+          </form>
+          <ul class="faq-list top-gap-inline">
+            {% for item in onboarding_emails %}
+              <li><div><strong>{{ item.subject }}</strong><span>{{ item.body }}</span></div><div class="record-meta"><span class="pill">{{ item.status.title() }}</span></div></li>
+            {% else %}
+              <p class="empty-state">No onboarding emails queued yet.</p>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

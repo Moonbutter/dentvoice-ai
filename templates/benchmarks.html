@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmarks - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Benchmarks</p><h1>See how clinics compare on bookings, calls, and recovered revenue.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/hq">HQ</a><a class="secondary-button link-button" href="/reports">Reports</a></div>
+    </section>
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Clinic Benchmark Report</h2><p>Free comparison layer across workspaces</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in benchmark_report %}
+              <li>
+                <div><strong>{{ item.clinic_name }}</strong><span>{{ item.business_type }}</span></div>
+                <div class="record-meta"><span>{{ item.calls }} calls</span><span>{{ item.appointments }} appointments</span><span>{{ item.conversion_rate }}%</span><span>₹{{ item.estimated_revenue_recovered }}</span></div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

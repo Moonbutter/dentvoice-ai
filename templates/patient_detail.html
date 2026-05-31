@@ -134,6 +134,26 @@
           {% endif %}
         </div>
       </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Internal Comments</h2><p>Team context that stays attached to this patient record</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in patient_detail.comments %}
+              <li>
+                <div><strong>{{ item.author_name }}</strong><span>{{ item.body }}</span></div>
+                <div class="record-meta"><span>{{ item.created_at[:16].replace("T", " ") }}</span></div>
+              </li>
+            {% else %}
+              <li><div><span>No patient comments yet.</span></div></li>
+            {% endfor %}
+          </ul>
+          <form class="comment-form top-gap-inline" data-entity-type="patient" data-entity-id="{{ patient_detail.profile.phone_number }}">
+            <label><span>Add patient comment</span><textarea name="body" rows="3" placeholder="Treatment concern, family follow-up note, repeat visit preference..." required></textarea></label>
+            <button type="submit" class="secondary-button">Save Comment</button>
+          </form>
+        </div>
+      </article>
     </section>
 
     <div id="toast" class="toast" hidden></div>

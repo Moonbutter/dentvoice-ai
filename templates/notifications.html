@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero compact-hero">
+      <div><p class="eyebrow">Notification Center</p><h1>{{ unread_notification_count }} unread update(s) need attention.</h1></div>
+      <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/inbox">Inbox</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
+    </section>
+    <section class="content-grid">
+      {% for item in notification_center %}
+        <article class="panel">
+          <div class="panel-body">
+            <div class="task-card-top">
+              <div>
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.message }}</span>
+                <span class="muted-line">{{ item.created_at[:16].replace("T", " ") }}</span>
+              </div>
+              <span class="pill{% if not item.is_read %} urgent{% endif %}">{% if item.is_read %}Read{% else %}Unread{% endif %}</span>
+            </div>
+            <div class="row-actions top-gap-inline">
+              {% if item.href %}<a class="link-inline" href="{{ item.href }}">Open</a>{% endif %}
+              {% if not item.is_read %}<button type="button" class="secondary-button notification-read" data-notification-id="{{ item.id }}">Mark Read</button>{% endif %}
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <article class="panel"><div class="panel-body"><p class="empty-state">No notifications yet.</p></div></article>
+      {% endfor %}
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>
