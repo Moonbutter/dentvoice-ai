@@ -16,6 +16,32 @@
       <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/inbox">Inbox</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
     </section>
     <section class="content-grid">
+      {% if current_role == "admin" %}
+      <article class="panel">
+        <div class="panel-header"><h2>Team Announcement</h2><p>Use internal announcements instead of external chat tools for simple operations</p></div>
+        <div class="panel-body">
+          <form id="announcement-form" class="stack-form">
+            <label><span>Title</span><input name="title" placeholder="Saturday shift update" required></label>
+            <label><span>Message</span><textarea name="body" rows="3" placeholder="Front desk opens at 8 AM tomorrow. Prioritize braces callbacks first." required></textarea></label>
+            <button type="submit" class="primary-button">Post Announcement</button>
+          </form>
+        </div>
+      </article>
+      {% endif %}
+      <article class="panel">
+        <div class="panel-header"><h2>Announcements Feed</h2><p>Reusable internal message center for staff</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in announcements %}
+              <li><div><strong>{{ item.title }}</strong><span>{{ item.body }}</span></div><div class="record-meta"><span>{{ item.created_at[:16].replace("T", " ") }}</span></div></li>
+            {% else %}
+              <li><div><span>No announcements posted yet.</span></div></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+    <section class="content-grid">
       {% for item in notification_center %}
         <article class="panel">
           <div class="panel-body">

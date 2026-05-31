@@ -285,6 +285,7 @@ def init_db() -> None:
                 password TEXT NOT NULL,
                 role TEXT NOT NULL,
                 display_name TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY (clinic_id) REFERENCES clinics(id)
             );
 
@@ -422,6 +423,46 @@ def init_db() -> None:
                 status TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS onboarding_state (
+                clinic_id INTEGER NOT NULL,
+                step_key TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                PRIMARY KEY (clinic_id, step_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS team_announcements (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS automation_rules (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                condition_key TEXT NOT NULL DEFAULT '',
+                condition_value TEXT NOT NULL DEFAULT '',
+                action_type TEXT NOT NULL,
+                action_value TEXT NOT NULL DEFAULT '',
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS access_logs (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                role TEXT NOT NULL,
+                action TEXT NOT NULL,
+                detail TEXT NOT NULL DEFAULT '',
+                ip_address TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
             """
         )
 
@@ -449,6 +490,8 @@ def init_db() -> None:
             db.execute("ALTER TABLE clinics ADD COLUMN white_label_name TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "clinics", "reseller_code"):
             db.execute("ALTER TABLE clinics ADD COLUMN reseller_code TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "clinic_users", "is_active"):
+            db.execute("ALTER TABLE clinic_users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
         if not column_exists(db, "contact_requests", "status"):
             db.execute("ALTER TABLE contact_requests ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
         if not column_exists(db, "contact_requests", "owner_notes"):
@@ -839,12 +882,74 @@ def fetch_clinic_users(clinic_id: int = 1) -> list[dict[str, object]]:
     with get_db() as db:
         rows = db.execute(
             """
-            SELECT id, clinic_id, username, role, display_name
+            SELECT id, clinic_id, username, role, display_name, is_active
             FROM clinic_users
             WHERE clinic_id = ?
             ORDER BY role ASC, username ASC
             """,
             (clinic_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_onboarding_state(clinic_id: int = 1) -> set[str]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT step_key
+            FROM onboarding_state
+            WHERE clinic_id = ?
+            """,
+            (clinic_id,),
+        ).fetchall()
+    return {str(row["step_key"]) for row in rows}
+
+
+def fetch_announcements(clinic_id: int = 1, active_only: bool = True, limit: int = 20) -> list[dict[str, object]]:
+    conditions = ["clinic_id = ?"]
+    params: list[object] = [clinic_id]
+    if active_only:
+        conditions.append("is_active = 1")
+    with get_db() as db:
+        rows = db.execute(
+            f"""
+            SELECT id, title, body, is_active, created_at
+            FROM team_announcements
+            WHERE {' AND '.join(conditions)}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            [*params, limit],
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_automation_rules(clinic_id: int = 1, limit: int = 50) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, name, trigger_type, condition_key, condition_value, action_type, action_value, is_enabled, created_at
+            FROM automation_rules
+            WHERE clinic_id = ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (clinic_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_access_logs(clinic_id: int = 1, limit: int = 100) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, username, role, action, detail, ip_address, created_at
+            FROM access_logs
+            WHERE clinic_id = ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (clinic_id, limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
@@ -1429,6 +1534,21 @@ def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str
         db.commit()
 
 
+def log_access_event(request: Request | None, clinic_id: int, username: str, role: str, action: str, detail: str = "") -> None:
+    ip_address = ""
+    if request is not None and request.client is not None:
+        ip_address = request.client.host or ""
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO access_logs (id, clinic_id, username, role, action, detail, ip_address, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid4()), clinic_id, username, role, action, detail, ip_address, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+
+
 def create_notification(clinic_id: int, title: str, message: str, href: str = "") -> None:
     with get_db() as db:
         db.execute(
@@ -1441,11 +1561,150 @@ def create_notification(clinic_id: int, title: str, message: str, href: str = ""
         db.commit()
 
 
+def mark_onboarding_step(clinic_id: int, step_key: str) -> None:
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO onboarding_state (clinic_id, step_key, completed_at)
+            VALUES (?, ?, ?)
+            """,
+            (clinic_id, step_key, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+
+
+def build_staff_performance(clinic_id: int = 1) -> list[dict[str, object]]:
+    team_users = fetch_clinic_users(clinic_id)
+    access_logs = fetch_access_logs(clinic_id, limit=1000)
+    performance_rows: list[dict[str, object]] = []
+    for user in team_users:
+        username = str(user["username"])
+        user_logs = [item for item in access_logs if item["username"] == username]
+        action_counts = Counter(item["action"] for item in user_logs)
+        follow_up_actions = sum(action_counts.get(key, 0) for key in ["task_created", "task_updated", "task_completed", "reminder_created", "reminder_updated", "lead_updated", "comment_added"])
+        last_seen = user_logs[0]["created_at"] if user_logs else ""
+        performance_rows.append(
+            {
+                "username": username,
+                "display_name": user["display_name"],
+                "role": user["role"],
+                "is_active": bool(user["is_active"]),
+                "login_count": action_counts.get("login", 0),
+                "follow_up_actions": follow_up_actions,
+                "task_completions": action_counts.get("task_completed", 0),
+                "reminder_actions": action_counts.get("reminder_updated", 0),
+                "comment_count": action_counts.get("comment_added", 0),
+                "last_seen": last_seen,
+            }
+        )
+    performance_rows.sort(key=lambda item: (item["follow_up_actions"], item["login_count"]), reverse=True)
+    return performance_rows
+
+
+def build_sla_dashboard(clinic_id: int = 1) -> dict[str, object]:
+    tasks = fetch_receptionist_tasks(limit=1000, clinic_id=clinic_id)
+    reminders = fetch_reminders(limit=1000, clinic_id=clinic_id)
+    overdue_tasks = sum(1 for item in tasks if item["sla_status"] == "overdue")
+    closed_tasks = sum(1 for item in tasks if item["status"] == "done")
+    pending_reminders = sum(1 for item in reminders if item["status"] in {"pending", "ready"})
+    sent_reminders = sum(1 for item in reminders if item["status"] == "sent")
+    return {
+        "overdue_tasks": overdue_tasks,
+        "closed_tasks": closed_tasks,
+        "task_closure_rate": round((closed_tasks / len(tasks)) * 100, 1) if tasks else 0.0,
+        "pending_reminders": pending_reminders,
+        "sent_reminders": sent_reminders,
+        "reminder_completion_rate": round((sent_reminders / len(reminders)) * 100, 1) if reminders else 0.0,
+    }
+
+
+def apply_automation_rules(
+    clinic_id: int,
+    *,
+    trigger_type: str,
+    payload: dict[str, object],
+) -> None:
+    for rule in fetch_automation_rules(clinic_id):
+        if not rule["is_enabled"] or rule["trigger_type"] != trigger_type:
+            continue
+        condition_key = str(rule["condition_key"] or "")
+        condition_value = str(rule["condition_value"] or "")
+        if condition_key and condition_value:
+            value = str(payload.get(condition_key, ""))
+            if value != condition_value:
+                continue
+        action_type = str(rule["action_type"])
+        action_value = str(rule["action_value"] or "")
+        if action_type == "create_notification":
+            create_notification(clinic_id, f"Automation: {rule['name']}", action_value or "Rule triggered.", "/notifications")
+        elif action_type == "create_task":
+            task_id = str(uuid4())
+            with get_db() as db:
+                db.execute(
+                    """
+                    INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, related_appointment_id, created_at, clinic_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        task_id,
+                        str(payload.get("patient_name") or "Workflow contact"),
+                        str(payload.get("phone_number") or ""),
+                        action_value or "Automation follow-up task",
+                        datetime.now(UTC).date().isoformat(),
+                        "open",
+                        "high",
+                        "automation",
+                        str(payload.get("appointment_id") or "") or None,
+                        datetime.now(UTC).isoformat(),
+                        clinic_id,
+                    ),
+                )
+                db.commit()
+            log_audit("create", "automation_task", task_id, f"Automation rule {rule['name']} created a task.", clinic_id=clinic_id)
+        elif action_type == "create_reminder" and payload.get("appointment_id"):
+            reminder_id = str(uuid4())
+            with get_db() as db:
+                db.execute(
+                    """
+                    INSERT INTO reminder_queue (id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, created_at, clinic_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        reminder_id,
+                        str(payload["appointment_id"]),
+                        str(payload.get("patient_name") or "Patient"),
+                        str(payload.get("phone_number") or ""),
+                        "automation_follow_up",
+                        datetime.now(UTC).isoformat(),
+                        "pending",
+                        action_value or "Automation reminder",
+                        datetime.now(UTC).isoformat(),
+                        clinic_id,
+                    ),
+                )
+                db.commit()
+            log_audit("create", "automation_reminder", reminder_id, f"Automation rule {rule['name']} queued a reminder.", clinic_id=clinic_id)
+
+
 def build_benchmark_report() -> list[dict[str, object]]:
     clinics = fetch_clinics()
     rows: list[dict[str, object]] = []
     for clinic in clinics:
-        analytics = fetch_analytics(int(clinic["id"]))
+        clinic_id = int(clinic["id"])
+        analytics = fetch_analytics(clinic_id)
+        sla = build_sla_dashboard(clinic_id)
+        health_score = max(
+            0,
+            min(
+                100,
+                int(
+                    40
+                    + analytics["conversion_rate"] * 0.6
+                    + analytics["completion_rate"] * 0.3
+                    - sla["overdue_tasks"] * 3
+                ),
+            ),
+        )
         rows.append(
             {
                 "clinic_name": clinic["clinic_name"],
@@ -1455,15 +1714,26 @@ def build_benchmark_report() -> list[dict[str, object]]:
                 "conversion_rate": analytics["conversion_rate"],
                 "estimated_revenue_recovered": analytics["estimated_revenue_recovered"],
                 "open_tasks": analytics["totals"]["open_tasks"],
+                "front_desk_health_score": health_score,
+                "forecast_next_month": analytics["estimated_revenue_recovered"] + analytics["pipeline_revenue_at_risk"],
             }
         )
-    rows.sort(key=lambda item: (item["estimated_revenue_recovered"], item["conversion_rate"]), reverse=True)
+    rows.sort(key=lambda item: (item["front_desk_health_score"], item["estimated_revenue_recovered"], item["conversion_rate"]), reverse=True)
     return rows
 
 
 def build_report_summary(clinic_id: int = 1) -> list[dict[str, object]]:
     analytics = fetch_analytics(clinic_id)
     settings = fetch_clinic_settings(clinic_id)
+    sla = build_sla_dashboard(clinic_id)
+    forecast_next_month = analytics["estimated_revenue_recovered"] + analytics["pipeline_revenue_at_risk"]
+    front_desk_health_score = max(
+        0,
+        min(
+            100,
+            int(40 + analytics["conversion_rate"] * 0.6 + analytics["completion_rate"] * 0.3 - sla["overdue_tasks"] * 3),
+        ),
+    )
     return [
         {"metric": "Clinic Name", "value": settings["clinic_name"]},
         {"metric": "Business Type", "value": str(settings.get("business_type", "")).replace("_", " ").title()},
@@ -1473,6 +1743,8 @@ def build_report_summary(clinic_id: int = 1) -> list[dict[str, object]]:
         {"metric": "Completed Rate", "value": f"{analytics['completion_rate']}%"},
         {"metric": "Estimated Revenue Recovered", "value": analytics["estimated_revenue_recovered"]},
         {"metric": "Pipeline Revenue At Risk", "value": analytics["pipeline_revenue_at_risk"]},
+        {"metric": "Next 30 Day Revenue Forecast", "value": forecast_next_month},
+        {"metric": "Front Desk Health Score", "value": f"{front_desk_health_score}/100"},
         {"metric": "Open Tasks", "value": analytics["totals"]["open_tasks"]},
         {"metric": "Pending Reminders", "value": analytics["totals"]["pending_reminders"]},
     ]
@@ -1759,6 +2031,17 @@ def create_appointment_record(
         )
         db.commit()
     send_whatsapp_confirmation(phone_number, patient_name, f"appointment booked for {preferred_date} at {preferred_time}", clinic_id=clinic_id)
+    apply_automation_rules(
+        clinic_id,
+        trigger_type="appointment_created",
+        payload={
+            "appointment_id": appointment.id,
+            "patient_name": patient_name,
+            "phone_number": phone_number,
+            "source": source,
+            "status": status,
+        },
+    )
     log_audit("create", "appointment", appointment.id, f"Created appointment for {patient_name} on {preferred_date} at {preferred_time}.", clinic_id=clinic_id)
     return appointment
 
@@ -1807,6 +2090,17 @@ def create_call_record(
     if fetch_clinic_settings(clinic_id).get("auto_callback_enabled", 1):
         if appointment_request is None and (urgent or intent in {"appointment_booking", "reschedule", "pricing"}):
             create_auto_callback_task(record, clinic_id=clinic_id)
+    apply_automation_rules(
+        clinic_id,
+        trigger_type="call_logged",
+        payload={
+            "patient_name": patient_name or "",
+            "phone_number": caller_number,
+            "intent": intent,
+            "lead_score": record.lead_score,
+            "urgent": "true" if urgent else "false",
+        },
+    )
     log_audit("create", "call_record", record.id, f"Logged {intent} call from {caller_number}.", clinic_id=clinic_id)
     return record
 
@@ -1847,60 +2141,86 @@ def build_setup_progress(clinic_id: int = 1) -> dict[str, object]:
     appointments = fetch_appointments(limit=50, clinic_id=clinic_id)
     reminders = fetch_reminders(limit=50, clinic_id=clinic_id)
     contacts = [item for item in fetch_contact_requests(limit=200) if item["clinic_name"].lower() == settings["clinic_name"].lower()]
+    onboarding_state = fetch_onboarding_state(clinic_id)
 
     steps = [
         {
+            "key": "template",
             "label": "Apply an industry template",
             "done": bool(settings.get("business_type")),
             "hint": "Choose the closest vertical so the copy, hours, FAQs, and benchmark values feel specific.",
             "href": "/setup#template-library",
         },
         {
+            "key": "branding",
             "label": "Brand the clinic page",
             "done": bool(settings.get("brand_tagline") and settings.get("logo_text") and settings.get("accent_color")),
             "hint": "Set the clinic name, tagline, logo text, and accent color so the landing page looks client-ready.",
             "href": "#settings-form",
         },
         {
+            "key": "hours",
             "label": "Define working hours",
             "done": bool(settings.get("working_days") and settings.get("working_hours")),
             "hint": "Working days and hours control slot generation and make the demo feel more real.",
             "href": "#settings-form",
         },
         {
+            "key": "slots",
             "label": "Review booking slots",
             "done": len(slots) >= 3,
             "hint": "Keep at least 3 live booking slots so the call workflow can always book a patient.",
             "href": "#slot-form",
         },
         {
+            "key": "faqs",
             "label": "Customize FAQs",
             "done": len(faqs) >= 4,
             "hint": "Edit the receptionist answers so the workflow sounds specific to the clinic or business type.",
             "href": "/dashboard#faq-manager",
         },
         {
+            "key": "appointments",
             "label": "Capture first appointments",
             "done": len(appointments) >= 1,
             "hint": "Seed demo data or create the first booking so analytics and reminders become visible.",
             "href": "/dashboard",
         },
         {
+            "key": "reminders",
             "label": "Queue reminders",
             "done": len(reminders) >= 1,
             "hint": "Set up reminder workflows so the clinic can see confirmations and follow-up operations.",
             "href": "/reminders",
         },
         {
+            "key": "lead_capture",
             "label": "Collect demand",
             "done": len(contacts) >= 1,
             "hint": "Use the public landing page to capture demo requests and prove the lead funnel works.",
             "href": "/leads",
         },
+        {
+            "key": "go_live",
+            "label": "Mark workspace launch-ready",
+            "done": "go_live" in onboarding_state,
+            "hint": "Once the checklist feels solid, mark the workspace ready for real demos and founder outreach.",
+            "href": "/setup#go-live-card",
+        },
     ]
+    for item in steps:
+        item["done"] = bool(item["done"] or item["key"] in onboarding_state)
     completed = sum(1 for item in steps if item["done"])
     percent = round((completed / len(steps)) * 100) if steps else 0
-    return {"steps": steps, "completed": completed, "total": len(steps), "percent": percent}
+    current_step = next((item for item in steps if not item["done"]), steps[-1] if steps else None)
+    return {
+        "steps": steps,
+        "completed": completed,
+        "total": len(steps),
+        "percent": percent,
+        "launch_ready": percent >= 80 and "go_live" in onboarding_state,
+        "current_step": current_step,
+    }
 
 
 def build_company_growth_metrics() -> dict[str, object]:
@@ -1929,6 +2249,11 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
     settings = fetch_clinic_settings(active_clinic_id)
     branding = normalize_branding(settings)
     company_growth = build_company_growth_metrics()
+    staff_performance = build_staff_performance(active_clinic_id)
+    sla_dashboard = build_sla_dashboard(active_clinic_id)
+    announcements = fetch_announcements(active_clinic_id, limit=10)
+    automation_rules = fetch_automation_rules(active_clinic_id, limit=50)
+    current_role = get_current_role(request)
     return {
         "stats": analytics["totals"],
         "appointments": fetch_appointments(limit=10, clinic_id=active_clinic_id),
@@ -1962,6 +2287,11 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "onboarding_emails": fetch_onboarding_emails(active_clinic_id),
         "benchmark_report": build_benchmark_report(),
         "report_summary": build_report_summary(active_clinic_id),
+        "staff_performance": staff_performance,
+        "sla_dashboard": sla_dashboard,
+        "announcements": announcements,
+        "automation_rules": automation_rules,
+        "access_logs": fetch_access_logs(active_clinic_id, limit=100),
         "chartjs_data": json.dumps(build_chartjs_datasets(analytics)),
         "analytics_charts": {
             "appointments_by_status": build_chart(analytics["appointments_by_status"], APPOINTMENT_STATUSES),
@@ -1979,7 +2309,8 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "task_statuses": TASK_STATUSES,
         "task_priorities": TASK_PRIORITIES,
         "contact_statuses": CONTACT_STATUSES,
-        "current_role": get_current_role(request),
+        "current_role": current_role,
+        "dashboard_variant": "admin" if current_role == "admin" else "receptionist",
         "session_display_name": request.session.get("dentvoice_display_name") if request else "",
         "session_username": request.session.get("dentvoice_username") if request else "",
         "asset_version": ASSET_VERSION,
@@ -2051,7 +2382,7 @@ async def login_submit(
             """
             SELECT clinic_id, role, display_name, username
             FROM clinic_users
-            WHERE username = ? AND password = ?
+            WHERE username = ? AND password = ? AND is_active = 1
             """,
             (username, password),
         ).fetchone()
@@ -2061,12 +2392,22 @@ async def login_submit(
         request.session["dentvoice_role"] = str(user["role"])
         request.session["dentvoice_display_name"] = str(user["display_name"])
         request.session["dentvoice_username"] = str(user["username"])
+        log_access_event(request, int(user["clinic_id"]), str(user["username"]), str(user["role"]), "login", "User signed in")
         return RedirectResponse(url=next_url or "/dashboard", status_code=303)
     return RedirectResponse(url=f"/login?next={next_url or '/dashboard'}&error=Invalid credentials", status_code=303)
 
 
 @app.post("/logout")
 async def logout(request: Request) -> RedirectResponse:
+    if is_authenticated(request):
+        log_access_event(
+            request,
+            get_active_clinic_id(request),
+            str(request.session.get("dentvoice_username") or ""),
+            str(request.session.get("dentvoice_role") or ""),
+            "logout",
+            "User signed out",
+        )
     request.session.clear()
     return RedirectResponse(url="/", status_code=303)
 
@@ -2498,6 +2839,8 @@ async def create_trial_signup(
     request.session["dentvoice_clinic_id"] = int(workspace["clinic_id"])
     request.session["dentvoice_role"] = "admin"
     request.session["dentvoice_display_name"] = f"{clinic_name} Admin"
+    request.session["dentvoice_username"] = str(workspace["admin_username"])
+    log_access_event(request, int(workspace["clinic_id"]), str(workspace["admin_username"]), "admin", "login", "Self-serve workspace signup")
     return JSONResponse(
         {
             "message": "Workspace created",
@@ -2516,6 +2859,7 @@ async def available_slots(request: Request) -> JSONResponse:
 
 @app.post("/api/contact-request")
 async def create_contact_request(
+    request: Request,
     name: str = Form(...),
     clinic_name: str = Form(...),
     phone_number: str = Form(...),
@@ -2533,6 +2877,16 @@ async def create_contact_request(
             (request_id, name, clinic_name, phone_number, message, created_at, business_type),
         )
         db.commit()
+    apply_automation_rules(
+        1,
+        trigger_type="lead_created",
+        payload={
+            "patient_name": name,
+            "phone_number": phone_number,
+            "business_type": business_type,
+            "source": "landing_page",
+        },
+    )
     log_audit("create", "contact_request", request_id, f"New demo request from {name} at {clinic_name}.")
     return JSONResponse({"message": "Demo request submitted"})
 
@@ -2558,8 +2912,10 @@ async def update_contact_request(
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Contact request not found")
-    create_notification(get_active_clinic_id(request), "Lead updated", f"Lead stage moved to {status.replace('_', ' ')}.", "/leads")
-    log_audit("update", "contact_request", request_id, f"Updated demo request status to {status}.", clinic_id=get_active_clinic_id(request))
+    clinic_id = get_active_clinic_id(request)
+    create_notification(clinic_id, "Lead updated", f"Lead stage moved to {status.replace('_', ' ')}.", "/leads")
+    log_audit("update", "contact_request", request_id, f"Updated demo request status to {status}.", clinic_id=clinic_id)
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "lead_updated", f"{request_id}:{status}")
     return JSONResponse({"message": "Demo request updated"})
 
 
@@ -2571,8 +2927,10 @@ async def update_contact_request_stage(request: Request, request_id: str, status
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Lead not found")
-    create_notification(get_active_clinic_id(request), "Pipeline updated", f"Lead moved to {status.replace('_', ' ')}.", "/leads")
-    log_audit("update", "contact_request", request_id, f"Moved lead to {status}.", clinic_id=get_active_clinic_id(request))
+    clinic_id = get_active_clinic_id(request)
+    create_notification(clinic_id, "Pipeline updated", f"Lead moved to {status.replace('_', ' ')}.", "/leads")
+    log_audit("update", "contact_request", request_id, f"Moved lead to {status}.", clinic_id=clinic_id)
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "lead_updated", f"{request_id}:{status}")
     return JSONResponse({"message": "Lead stage updated"})
 
 
@@ -2905,6 +3263,107 @@ async def apply_industry_template(request: Request, business_type: str = Form(..
     return JSONResponse({"message": "Industry template applied"})
 
 
+@app.post("/api/onboarding/steps/{step_key}")
+async def complete_onboarding_step(request: Request, step_key: str) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    mark_onboarding_step(clinic_id, step_key)
+    create_notification(clinic_id, "Onboarding progress updated", f"Completed setup step: {step_key.replace('_', ' ')}.", "/setup")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "onboarding_step_completed", step_key)
+    return JSONResponse({"message": "Onboarding step completed"})
+
+
+@app.post("/api/onboarding/preset")
+async def apply_onboarding_preset(request: Request, business_type: str = Form(...)) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    settings = fetch_clinic_settings(clinic_id)
+    available_slots = fetch_slots(clinic_id)
+    if not available_slots:
+        raise HTTPException(status_code=400, detail="Add at least one slot before loading a preset.")
+    patient_name = f"{INDUSTRY_TEMPLATES.get(business_type, INDUSTRY_TEMPLATES['dental'])['label'].split()[0]} Demo Lead"
+    appointment = None
+    for slot in available_slots:
+        try:
+            appointment = create_appointment_record(
+                patient_name=patient_name,
+                phone_number="+919999900001",
+                preferred_date=slot["date"],
+                preferred_time=slot["time"],
+                reason_for_visit="Preset demo workflow",
+                source="admin",
+                status="confirmed",
+                notes=f"Preset demo appointment for {business_type} workspace.",
+                clinic_id=clinic_id,
+            )
+            break
+        except HTTPException:
+            continue
+    if appointment is None:
+        raise HTTPException(status_code=409, detail="All current slots are already booked. Add a new slot first.")
+    create_call_record(
+        caller_number="+919999900001",
+        patient_name=patient_name,
+        intent="appointment_booking",
+        summary=f"Preset demo call for {settings['clinic_name']} in {business_type}.",
+        urgent=False,
+        appointment_request=appointment,
+        clinic_id=clinic_id,
+    )
+    mark_onboarding_step(clinic_id, "appointments")
+    create_notification(clinic_id, "Industry preset loaded", f"Preset demo data added for {business_type.replace('_', ' ')}.", "/setup")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "industry_preset_loaded", business_type)
+    return JSONResponse({"message": "Industry preset loaded"})
+
+
+@app.post("/api/announcements")
+async def create_announcement(
+    request: Request,
+    title: str = Form(...),
+    body: str = Form(...),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO team_announcements (id, clinic_id, title, body, is_active, created_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            """,
+            (str(uuid4()), clinic_id, title, body, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    create_notification(clinic_id, "Announcement posted", title, "/notifications")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "announcement_created", title)
+    return JSONResponse({"message": "Announcement posted"})
+
+
+@app.post("/api/automation-rules")
+async def create_automation_rule(
+    request: Request,
+    name: str = Form(...),
+    trigger_type: str = Form(...),
+    condition_key: str = Form(default=""),
+    condition_value: str = Form(default=""),
+    action_type: str = Form(...),
+    action_value: str = Form(default=""),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO automation_rules (id, clinic_id, name, trigger_type, condition_key, condition_value, action_type, action_value, is_enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            """,
+            (str(uuid4()), clinic_id, name, trigger_type, condition_key, condition_value, action_type, action_value, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    create_notification(clinic_id, "Automation rule added", name, "/setup")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "automation_rule_created", name)
+    return JSONResponse({"message": "Automation rule created"})
+
+
 @app.post("/api/receptionist-tasks")
 async def create_receptionist_task(
     request: Request,
@@ -2942,6 +3401,7 @@ async def create_receptionist_task(
         )
         db.commit()
     create_notification(clinic_id, "Task created", f"New follow-up task for {patient_name}.", "/inbox")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "task_created", patient_name)
     log_audit("create", "receptionist_task", task_id, f"Created follow-up task for {patient_name}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Receptionist task created"})
 
@@ -2972,6 +3432,7 @@ async def create_missed_lead_task(
             (task_id, patient_name, phone_number, note, due_date, "open", priority, tags, None, datetime.now(UTC).isoformat(), clinic_id),
         )
         db.commit()
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "task_created", patient_name)
     log_audit("create", "receptionist_task", task_id, f"Created missed-lead recovery task for {patient_name}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Recovery task created"})
 
@@ -3000,6 +3461,8 @@ async def update_receptionist_task(
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Receptionist task not found")
+    action_name = "task_completed" if status == "done" else "task_updated"
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), action_name, task_id)
     log_audit("update", "receptionist_task", task_id, f"Updated receptionist task to {status}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Receptionist task updated"})
 
@@ -3026,6 +3489,7 @@ async def create_reminder(
             (reminder_id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, "pending", note, datetime.now(UTC).isoformat(), clinic_id),
         )
         db.commit()
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "reminder_created", patient_name)
     log_audit("create", "reminder", reminder_id, f"Queued {reminder_type} reminder for {patient_name}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Reminder queued"})
 
@@ -3051,6 +3515,7 @@ async def update_reminder(
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Reminder not found")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "reminder_updated", f"{reminder_id}:{status}")
     log_audit("update", "reminder", reminder_id, f"Updated reminder to {status}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Reminder updated"})
 
@@ -3067,11 +3532,12 @@ async def create_team_user(
     clinic_id = get_active_clinic_id(request)
     with get_db() as db:
         db.execute(
-            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name, is_active) VALUES (?, ?, ?, ?, ?, 1)",
             (clinic_id, username, password, role, display_name),
         )
         db.commit()
     create_notification(clinic_id, "Team user added", f"{display_name} was added as {role}.", "/team")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "team_user_created", username)
     return JSONResponse({"message": "Team user created"})
 
 
@@ -3099,7 +3565,30 @@ async def update_team_user(
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Team user not found")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "team_user_updated", str(user_id))
     return JSONResponse({"message": "Team user updated"})
+
+
+@app.post("/api/team/users/{user_id}/toggle")
+async def toggle_team_user(
+    request: Request,
+    user_id: int,
+    is_active: int = Form(...),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        result = db.execute(
+            "UPDATE clinic_users SET is_active = ? WHERE id = ? AND clinic_id = ?",
+            (is_active, user_id, clinic_id),
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Team user not found")
+    state_label = "activated" if is_active else "deactivated"
+    create_notification(clinic_id, "Team access changed", f"User account was {state_label}.", "/team")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "team_user_toggled", f"{user_id}:{state_label}")
+    return JSONResponse({"message": f"User {state_label}"})
 
 
 @app.post("/api/password/change")
@@ -3123,6 +3612,7 @@ async def change_password(
         db.execute("UPDATE clinic_users SET password = ? WHERE id = ?", (new_password, row["id"]))
         db.commit()
     create_notification(clinic_id, "Password updated", f"Credentials changed for {username}.", "/team")
+    log_access_event(request, clinic_id, username or session_username, str(request.session.get("dentvoice_role") or ""), "password_changed", username or session_username)
     return JSONResponse({"message": "Password updated"})
 
 
@@ -3160,6 +3650,7 @@ async def create_referral(
         )
         db.commit()
     create_notification(clinic_id, "Referral added", f"Referral captured for {referred_business}.", "/hq")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "referral_added", referred_business)
     return JSONResponse({"message": "Referral created"})
 
 
@@ -3182,6 +3673,7 @@ async def queue_onboarding_email(
             (email_id, clinic_id, subject, body, status, datetime.now(UTC).isoformat()),
         )
         db.commit()
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "onboarding_email_queued", subject)
     return JSONResponse({"message": "Onboarding email queued"})
 
 
@@ -3204,6 +3696,7 @@ async def create_comment(
             (str(uuid4()), clinic_id, entity_type, entity_id, author_name, body, datetime.now(UTC).isoformat()),
         )
         db.commit()
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "comment_added", entity_type)
     return JSONResponse({"message": "Comment added"})
 
 

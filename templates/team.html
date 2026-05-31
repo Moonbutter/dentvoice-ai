@@ -47,15 +47,50 @@
           <div class="panel-body">
             <form class="team-user-edit-form stack-form card-form" data-user-id="{{ user.id }}">
               <strong>{{ user.username }}</strong>
-              <span class="muted-line">{{ user.display_name }}</span>
+              <span class="muted-line">{{ user.display_name }} · {% if user.is_active %}Active{% else %}Inactive{% endif %}</span>
               <label><span>Display name</span><input name="display_name" value="{{ user.display_name }}" required></label>
               <label><span>Role</span><select name="role"><option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option><option value="receptionist" {% if user.role == "receptionist" %}selected{% endif %}>Receptionist</option></select></label>
               <label><span>Reset password</span><input name="password" placeholder="Leave empty to keep current"></label>
-              <button type="submit" class="primary-button">Save User</button>
+              <div class="row-actions">
+                <button type="submit" class="primary-button">Save User</button>
+                <button type="button" class="secondary-button team-user-toggle" data-user-id="{{ user.id }}" data-next-active="{% if user.is_active %}0{% else %}1{% endif %}">{% if user.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+              </div>
             </form>
           </div>
         </article>
       {% endfor %}
+    </section>
+
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Staff Performance Dashboard</h2><p>Track activity, follow-up actions, and response work by user</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in staff_performance %}
+              <li>
+                <div><strong>{{ item.display_name }}</strong><span>{{ item.role.title() }} · {{ item.follow_up_actions }} follow-up actions · {{ item.task_completions }} task completions</span></div>
+                <div class="record-meta"><span>{{ item.login_count }} logins</span><span>{% if item.last_seen %}{{ item.last_seen[:16].replace("T", " ") }}{% else %}No activity yet{% endif %}</span></div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Access Logs</h2><p>Free audit layer for sign-ins and workflow actions</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in access_logs[:20] %}
+              <li>
+                <div><strong>{{ item.username }}</strong><span>{{ item.action.replace("_", " ").title() }}{% if item.detail %} · {{ item.detail }}{% endif %}</span></div>
+                <div class="record-meta"><span>{{ item.role.title() }}</span><span>{{ item.created_at[:16].replace("T", " ") }}</span></div>
+              </li>
+            {% else %}
+              <li><div><span>No access logs yet.</span></div></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
     </section>
     <div id="toast" class="toast" hidden></div>
   </main>

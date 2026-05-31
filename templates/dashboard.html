@@ -128,6 +128,13 @@
       <article class="stat-card"><span class="stat-label">Pending Reminders</span><strong class="stat-value">{{ stats.pending_reminders }}</strong></article>
     </section>
 
+    <section class="kpi-strip top-gap">
+      <div><strong>{{ setup_progress.percent }}%</strong><span>Workspace readiness</span></div>
+      <div><strong>{{ sla_dashboard.overdue_tasks }}</strong><span>Overdue tasks</span></div>
+      <div><strong>{{ unread_notification_count }}</strong><span>Unread notifications</span></div>
+      <div><strong>{{ staff_performance[0].display_name if staff_performance else "No team yet" }}</strong><span>Most active team member</span></div>
+    </section>
+
     <section class="content-grid">
       <article class="panel">
         <div class="panel-header"><h2>Admin Booking</h2><p>Create appointments manually from the dashboard</p></div>
@@ -231,6 +238,18 @@
       </article>
 
       <article class="panel">
+        <div class="panel-header"><h2>Launch Readiness</h2><p>Free onboarding activation before you move into paid integrations</p></div>
+        <div class="panel-body">
+          <div class="mini-metrics">
+            <div class="mini-metric"><strong>{{ setup_progress.completed }}</strong><span>Checklist steps done</span></div>
+            <div class="mini-metric"><strong>{{ setup_progress.percent }}%</strong><span>Readiness score</span></div>
+            <div class="mini-metric"><strong>{% if setup_progress.launch_ready %}Yes{% else %}No{% endif %}</strong><span>Marked launch-ready</span></div>
+          </div>
+          <a class="secondary-button link-button top-gap-inline" href="/setup">Open guided setup</a>
+        </div>
+      </article>
+
+      <article class="panel">
         <div class="panel-header"><h2>Receptionist Follow-up Workflow</h2><p>Track callbacks, confirmations, and manual follow-up work</p></div>
         <div class="panel-body">
           <form id="task-form" class="stack-form">
@@ -246,6 +265,20 @@
             <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}">{{ task_priority.title() }}</option>{% endfor %}</select></label>
             <button type="submit" class="primary-button">Create Task</button>
           </form>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Internal Announcements</h2><p>Simple message center for the clinic team</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in announcements[:4] %}
+              <li><div><strong>{{ item.title }}</strong><span>{{ item.body }}</span></div><div class="record-meta"><span>{{ item.created_at[:10] }}</span></div></li>
+            {% else %}
+              <li><div><span>No internal announcements yet.</span></div></li>
+            {% endfor %}
+          </ul>
+          <a class="secondary-button link-button top-gap-inline" href="/notifications">Open notification center</a>
         </div>
       </article>
 

@@ -50,6 +50,12 @@ DentVoice AI is a lightweight MVP for an AI receptionist and revenue-recovery pl
 - Advanced search segmentation and tag-based workflows
 - Task SLA tracking and response-state visibility
 - Industry case-study pages for vertical sales conversations
+- Persistent onboarding step tracking and launch-readiness scoring
+- Industry demo presets for faster workspace activation
+- Staff performance dashboard and access logs
+- Internal announcement center
+- Basic no-code automation rules for notifications, tasks, and reminders
+- Team user activation/deactivation controls
 
 ## Project Structure
 
@@ -120,7 +126,12 @@ uvicorn app.main:app --reload
 - `POST /api/team/users` - Create a clinic user
 - `POST /api/team/users/{user_id}/update` - Update role, display name, or password
 - `POST /api/password/change` - Change the logged-in user's password
+- `POST /api/team/users/{user_id}/toggle` - Activate or deactivate a team user
 - `POST /api/notifications/{notification_id}/read` - Mark a notification as read
+- `POST /api/announcements` - Post an internal team announcement
+- `POST /api/onboarding/steps/{step_key}` - Mark onboarding setup progress
+- `POST /api/onboarding/preset` - Load industry-specific demo preset data
+- `POST /api/automation-rules` - Create a no-code workflow automation rule
 - `POST /api/referrals` - Create a referral / reseller lead
 - `POST /api/onboarding-emails` - Queue a simulated onboarding email
 - `POST /api/comments` - Add an internal comment to a patient, lead, or task

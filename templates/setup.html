@@ -26,6 +26,7 @@
         <div class="hero-meta">
           <span>{{ setup_progress.completed }} of {{ setup_progress.total }} setup tasks done</span>
           <span>{{ setup_progress.percent }}% workspace ready</span>
+          <span>{% if setup_progress.launch_ready %}Launch Ready{% else %}Still configuring{% endif %}</span>
           <span>{{ session_display_name }}</span>
         </div>
       </div>
@@ -90,6 +91,16 @@
           <p>Follow this order to make the workspace look production-ready</p>
         </div>
         <div class="panel-body">
+          {% if setup_progress.current_step %}
+            <div class="card-form" id="go-live-card">
+              <strong>Current guided step: {{ setup_progress.current_step.label }}</strong>
+              <p class="message-paragraph">{{ setup_progress.current_step.hint }}</p>
+              <div class="row-actions">
+                <a class="link-inline" href="{{ setup_progress.current_step.href }}">Open this step</a>
+                <button type="button" class="secondary-button onboarding-step-complete" data-step-key="{{ setup_progress.current_step.key }}">Mark complete</button>
+              </div>
+            </div>
+          {% endif %}
           <div class="stack-list">
             {% for item in setup_progress.steps %}
               <div class="task-card">
@@ -102,6 +113,7 @@
                 </div>
                 <div class="row-actions">
                   <a class="link-inline" href="{{ item.href }}">Open step</a>
+                  {% if not item.done %}<button type="button" class="secondary-button onboarding-step-complete" data-step-key="{{ item.key }}">Mark complete</button>{% endif %}
                 </div>
               </div>
             {% endfor %}
@@ -216,6 +228,53 @@
             <li>Use the template library to make each workspace feel vertical-specific before outreach.</li>
             <li>Capture every inbound inquiry through the public page and the demo CRM.</li>
             <li>Track recovered revenue and free-trial pipeline before layering in paid calling and messaging.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Load Demo Preset</h2>
+          <p>Create a realistic first booking + call flow for the selected industry</p>
+        </div>
+        <div class="panel-body">
+          <form id="onboarding-preset-form" class="stack-form">
+            <label><span>Preset industry</span><select name="business_type">{% for item in business_types %}<option value="{{ item }}" {% if settings.business_type == item %}selected{% endif %}>{{ industry_templates[item].label }}</option>{% endfor %}</select></label>
+            <button type="submit" class="secondary-button">Load Industry Preset</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header">
+          <h2>Workflow Automation Rules</h2>
+          <p>Free no-code logic for tasks, reminders, and internal notifications</p>
+        </div>
+        <div class="panel-body">
+          <form id="automation-rule-form" class="stack-form card-form">
+            <div class="split-grid">
+              <label><span>Rule name</span><input name="name" placeholder="Hot lead callback" required></label>
+              <label><span>Trigger</span><select name="trigger_type"><option value="call_logged">Call logged</option><option value="appointment_created">Appointment created</option><option value="lead_created">Lead created</option></select></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Condition key</span><select name="condition_key"><option value="">No condition</option><option value="lead_score">Lead score</option><option value="intent">Intent</option><option value="business_type">Business type</option><option value="source">Source</option></select></label>
+              <label><span>Condition value</span><input name="condition_value" placeholder="hot, appointment_booking, dental"></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Action</span><select name="action_type"><option value="create_task">Create task</option><option value="create_reminder">Create reminder</option><option value="create_notification">Create notification</option></select></label>
+              <label><span>Action message</span><input name="action_value" placeholder="Call back within 15 minutes"></label>
+            </div>
+            <button type="submit" class="primary-button">Create Automation Rule</button>
+          </form>
+          <ul class="faq-list top-gap-inline">
+            {% for item in automation_rules %}
+              <li>
+                <div><strong>{{ item.name }}</strong><span>{{ item.trigger_type.replace("_", " ").title() }}{% if item.condition_key %} when {{ item.condition_key.replace("_", " ") }} = {{ item.condition_value }}{% endif %}</span></div>
+                <div class="record-meta"><span>{{ item.action_type.replace("_", " ").title() }}</span></div>
+              </li>
+            {% else %}
+              <li><div><span>No automation rules yet.</span></div></li>
+            {% endfor %}
           </ul>
         </div>
       </article>

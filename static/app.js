@@ -555,6 +555,19 @@ document.querySelectorAll(".team-user-edit-form").forEach((form) => {
   });
 });
 
+document.querySelectorAll(".team-user-toggle").forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      const formData = new FormData();
+      formData.set("is_active", button.dataset.nextActive);
+      await postForm(`/api/team/users/${button.dataset.userId}/toggle`, formData);
+      refreshPage("User access updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
 document.getElementById("password-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -577,6 +590,17 @@ document.querySelectorAll(".notification-read").forEach((button) => {
   });
 });
 
+document.getElementById("announcement-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/announcements", formData);
+    refreshPage("Announcement posted");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 document.getElementById("referral-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -594,6 +618,39 @@ document.getElementById("onboarding-email-form")?.addEventListener("submit", asy
     const formData = new FormData(event.currentTarget);
     await postForm("/api/onboarding-emails", formData);
     refreshPage("Onboarding email queued");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.querySelectorAll(".onboarding-step-complete").forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      await postForm(`/api/onboarding/steps/${button.dataset.stepKey}`, new FormData());
+      refreshPage("Setup progress updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.getElementById("onboarding-preset-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/onboarding/preset", formData);
+    refreshPage("Industry preset loaded");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("automation-rule-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/automation-rules", formData);
+    refreshPage("Automation rule created");
   } catch (error) {
     showToast(error.message, "error");
   }

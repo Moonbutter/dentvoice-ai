@@ -28,8 +28,8 @@
           <ul class="faq-list">
             {% for clinic in benchmark_report %}
               <li>
-                <div><strong>{{ clinic.clinic_name }}</strong><span>{{ clinic.business_type }} · {{ clinic.appointments }} appointments · {{ clinic.calls }} calls</span></div>
-                <div class="record-meta"><span>{{ clinic.conversion_rate }}% conversion</span><span>₹{{ clinic.estimated_revenue_recovered }}</span></div>
+                <div><strong>{{ clinic.clinic_name }}</strong><span>{{ clinic.business_type }} · Health {{ clinic.front_desk_health_score }}/100 · {{ clinic.appointments }} appointments · {{ clinic.calls }} calls</span></div>
+                <div class="record-meta"><span>{{ clinic.conversion_rate }}% conversion</span><span>₹{{ clinic.forecast_next_month }} forecast</span></div>
               </li>
             {% endfor %}
           </ul>

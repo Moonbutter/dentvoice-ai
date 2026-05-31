@@ -54,6 +54,13 @@
       <div><strong>₹{{ company_growth.estimated_mrr }}</strong><span>Estimated MRR</span></div>
     </section>
 
+    <section class="kpi-strip analytics-kpis top-gap">
+      <div><strong>{{ sla_dashboard.overdue_tasks }}</strong><span>Overdue tasks</span></div>
+      <div><strong>{{ sla_dashboard.task_closure_rate }}%</strong><span>Task closure rate</span></div>
+      <div><strong>{{ sla_dashboard.pending_reminders }}</strong><span>Pending reminders</span></div>
+      <div><strong>{{ sla_dashboard.reminder_completion_rate }}%</strong><span>Reminder completion rate</span></div>
+    </section>
+
     <section class="content-grid">
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Revenue Recovery Story</h2><p>Translate appointment workflow into a business outcome a clinic owner understands</p></div>
@@ -107,6 +114,19 @@
             <li><strong>Lead Scores</strong><span>Highlights which calls deserve fast follow-up from the clinic team.</span></li>
             <li><strong>7-Day Trend</strong><span>Gives a lightweight activity graph even before adding any paid analytics stack.</span></li>
             <li><strong>Revenue Metrics</strong><span>Help explain the ROI of the product without needing paid telecom or AI integrations yet.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Staff Performance Snapshot</h2><p>See which team members are driving follow-up activity</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in staff_performance[:6] %}
+              <li>
+                <div><strong>{{ item.display_name }}</strong><span>{{ item.follow_up_actions }} follow-up actions · {{ item.task_completions }} task completions · {{ item.comment_count }} comments</span></div>
+                <div class="record-meta"><span>{{ item.login_count }} logins</span><span>{% if item.last_seen %}{{ item.last_seen[:16].replace("T", " ") }}{% else %}No activity{% endif %}</span></div>
+              </li>
+            {% endfor %}
           </ul>
         </div>
       </article>

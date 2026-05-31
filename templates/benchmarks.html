@@ -22,8 +22,8 @@
           <ul class="faq-list">
             {% for item in benchmark_report %}
               <li>
-                <div><strong>{{ item.clinic_name }}</strong><span>{{ item.business_type }}</span></div>
-                <div class="record-meta"><span>{{ item.calls }} calls</span><span>{{ item.appointments }} appointments</span><span>{{ item.conversion_rate }}%</span><span>₹{{ item.estimated_revenue_recovered }}</span></div>
+                <div><strong>{{ item.clinic_name }}</strong><span>{{ item.business_type }} · Health {{ item.front_desk_health_score }}/100</span></div>
+                <div class="record-meta"><span>{{ item.calls }} calls</span><span>{{ item.appointments }} appointments</span><span>{{ item.conversion_rate }}%</span><span>₹{{ item.forecast_next_month }} forecast</span></div>
               </li>
             {% endfor %}
           </ul>
