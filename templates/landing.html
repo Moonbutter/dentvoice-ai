@@ -18,19 +18,19 @@
         <div class="brand-lockup">
           <div class="logo-badge">{{ branding.logo_text }}</div>
           <div>
-        <p class="eyebrow">Voice AI for Dental Clinics</p>
-        <h1>DentVoice AI answers calls, captures appointments, and keeps your front desk moving.</h1>
+        <p class="eyebrow">Revenue Recovery AI for Service Businesses</p>
+        <h1>Stop losing customers when nobody answers the phone.</h1>
           </div>
         </div>
-        <p class="hero-copy">{{ branding.brand_tagline }}. A 24/7 AI receptionist built for Indian dental clinics. It handles inbound calls, supports appointment booking, flags urgent cases, and gives your team a live operating dashboard.</p>
+        <p class="hero-copy">{{ branding.brand_tagline }}. DentVoice helps clinics and appointment-led businesses recover missed revenue by answering instantly, capturing leads, booking appointments, and keeping follow-up work visible in one operating dashboard.</p>
         <div class="hero-actions">
           {% if is_authenticated %}
             <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
           {% else %}
             <a class="primary-button link-button" href="/login">Clinic Login</a>
           {% endif %}
-          <a class="secondary-button link-button" href="/calendar">View Calendar</a>
-          <a class="secondary-button link-button" href="/patients">Patient Profiles</a>
+          <a class="secondary-button link-button" href="#pricing">View Pricing</a>
+          <a class="secondary-button link-button" href="#industries">Use Cases</a>
           <a class="secondary-button link-button" href="https://github.com/Moonbutter/dentvoice-ai">View GitHub</a>
         </div>
         <div class="hero-meta">
@@ -41,81 +41,221 @@
         </div>
       </div>
       <div class="landing-card">
-        <p class="landing-card-label">What it already does</p>
+        <p class="landing-card-label">Why businesses buy this</p>
         <ul class="feature-list">
-          <li>Inbound call workflow for appointment booking</li>
-          <li>Persistent clinic data with SQLite</li>
-          <li>Editable clinic settings and booking slots</li>
-          <li>CSV export for operations tracking</li>
-          <li>Twilio-compatible voice webhook flow</li>
-          <li>Calendar, patient profiles, analytics, audit logs, and local login</li>
+          <li>Missed calls become missed revenue when patients move to the next clinic or business.</li>
+          <li>DentVoice answers instantly, captures the inquiry, and keeps the lead inside your workflow.</li>
+          <li>Even one recovered patient or booking can justify a ₹5,000 monthly subscription.</li>
+          <li>Works for clinics first, but the same model fits salons and real estate teams too.</li>
         </ul>
       </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card alert"><span class="stat-label">Problem</span><strong class="stat-value">Revenue Leakage</strong><span>Businesses pay for ads, SEO, and referrals, then lose leads because nobody answers in time.</span></article>
+      <article class="stat-card"><span class="stat-label">Fix</span><strong class="stat-value">Instant Response</strong><span>Answer every call, capture the lead, and route the next action immediately.</span></article>
+      <article class="stat-card"><span class="stat-label">Entry Price</span><strong class="stat-value">₹4,999</strong><span>Simple starter plan for one clinic or one business location.</span></article>
+      <article class="stat-card"><span class="stat-label">ROI Logic</span><strong class="stat-value">1-3 Leads</strong><span>Recover a few missed opportunities and the software can pay for itself.</span></article>
     </section>
 
     <section class="landing-grid">
       <article class="panel">
         <div class="panel-header">
-          <h2>Built for Real Clinic Workflows</h2>
-          <p>Specialized for dental front-desk operations instead of generic chatbot tasks</p>
+          <h2>The Real Problem</h2>
+          <p>Businesses lose customers because no one responds fast enough</p>
         </div>
         <div class="panel-body">
           <ul class="faq-list">
-            <li><strong>Appointment capture</strong><span>Patients can move through a booking flow and get structured follow-up.</span></li>
-            <li><strong>Urgent case routing</strong><span>Emergency-style calls are highlighted for fast human review.</span></li>
-            <li><strong>Clinic operations view</strong><span>The dashboard tracks appointments, calls, messages, slot availability, receptionist tasks, and demo requests.</span></li>
+            <li><strong>Dental clinics</strong><span>Receptionist is busy, lunch break is on, or the clinic is closed. The patient calls the next clinic.</span></li>
+            <li><strong>Real estate</strong><span>The broker is driving or showing a property. The lead disappears in minutes.</span></li>
+            <li><strong>Salons</strong><span>The customer wants a weekend slot, no one answers, and the booking goes somewhere else.</span></li>
           </ul>
         </div>
       </article>
 
       <article class="panel">
         <div class="panel-header">
-          <h2>Live Product Links</h2>
-          <p>Use these to review the project, demo it, or add it to LinkedIn</p>
+          <h2>Your Solution</h2>
+          <p>DentVoice is positioned as a revenue recovery product, not just an AI bot</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Answers instantly</strong><span>No patient or lead waits for someone to become free.</span></li>
+            <li><strong>Captures appointments</strong><span>Requests move straight into the booking workflow instead of getting forgotten.</span></li>
+            <li><strong>Sends confirmations</strong><span>Follow-up details can be tracked through reminders and future messaging integrations.</span></li>
+            <li><strong>Protects ad spend</strong><span>Leads generated from Google Ads, Meta Ads, referrals, and SEO are less likely to be wasted.</span></li>
+            <li><strong>Tracks operations</strong><span>Dashboard, inbox, reminders, analytics, and exports make the product measurable.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel" id="pricing">
+        <div class="panel-header">
+          <h2>Starter Pricing</h2>
+          <p>A simple India-friendly SaaS model built around recovered revenue</p>
+        </div>
+        <div class="panel-body">
+          <div class="pricing-grid">
+            <article class="pricing-card featured">
+              <p class="landing-card-label">Starter</p>
+              <h3>₹4,999 / month</h3>
+              <ul class="feature-list">
+                <li>1 clinic or 1 business location</li>
+                <li>Call answering and appointment capture</li>
+                <li>Dashboard, reminders, analytics, and exports</li>
+                <li>Missed-lead recovery and receptionist inbox</li>
+                <li>Best for first pilots and local clinics</li>
+              </ul>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Growth</p>
+              <h3>₹9,999 / month</h3>
+              <ul class="feature-list">
+                <li>Higher call volume support</li>
+                <li>Multi-user workflow access</li>
+                <li>Stronger analytics and branding control</li>
+                <li>Better fit for busy clinics and teams</li>
+              </ul>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Multi-Location</p>
+              <h3>₹14,999+ / month</h3>
+              <ul class="feature-list">
+                <li>Multiple branches</li>
+                <li>Role-based operations</li>
+                <li>Export-ready reporting</li>
+                <li>Ideal for chains and larger operations</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Payment Options</h2>
+          <p>Keep the buying decision simple for local clinics and service businesses</p>
+        </div>
+        <div class="panel-body">
+          <div class="pricing-grid">
+            <article class="pricing-card">
+              <p class="landing-card-label">Monthly Payments</p>
+              <h3>₹4,999 every month</h3>
+              <p class="message-paragraph">Best for first-time customers who want to start small and validate recovered revenue quickly.</p>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Quarterly Option</p>
+              <h3>₹14,000 every 3 months</h3>
+              <p class="message-paragraph">Good for clinics that want a small upfront discount and less monthly admin work.</p>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">How They Can Pay</p>
+              <h3>UPI, bank transfer, card invoice</h3>
+              <p class="message-paragraph">Start with UPI and bank transfer for India, then layer in Razorpay or subscription billing later when you want automation.</p>
+            </article>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Why ₹5,000/Month Works</h2>
+          <p>The subscription is easy to justify if the business already loses inbound demand</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Dental</strong><span>One missed patient can be worth ₹2,000 to ₹20,000+ over time depending on treatment.</span></li>
+            <li><strong>Real estate</strong><span>One missed property lead can be worth far more than the monthly subscription.</span></li>
+            <li><strong>Salons</strong><span>Weekend booking demand is high, and missed calls often turn into lost repeat customers.</span></li>
+            <li><strong>Simple ROI</strong><span>If DentVoice helps recover even a few missed inquiries in a month, the fee can pay for itself.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two" id="industries">
+        <div class="panel-header">
+          <h2>Best Early Use Cases</h2>
+          <p>Start with one niche, then expand the same revenue-recovery model</p>
+        </div>
+        <div class="panel-body">
+          <div class="pricing-grid">
+            <article class="pricing-card">
+              <p class="landing-card-label">Dental Clinics</p>
+              <h3>Missed calls become lost appointments</h3>
+              <p class="message-paragraph">Patients call during procedures, after hours, or when staff is overloaded. DentVoice answers, captures intent, and reduces front-desk leakage.</p>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Real Estate</p>
+              <h3>Fast leads disappear in minutes</h3>
+              <p class="message-paragraph">If a broker is driving or showing property, the lead often goes elsewhere. DentVoice keeps the lead inside the system for quick follow-up.</p>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Salons</p>
+              <h3>Peak-time bookings are easy to lose</h3>
+              <p class="message-paragraph">If no one answers a Saturday booking request, the customer simply books elsewhere. DentVoice helps capture those high-intent calls.</p>
+            </article>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two">
+        <div class="panel-header">
+          <h2>Who To Target First</h2>
+          <p>Roll out by ticket size, workflow fit, and urgency of missed inbound calls</p>
+        </div>
+        <div class="panel-body">
+          <div class="pricing-grid">
+            <article class="pricing-card featured">
+              <p class="landing-card-label">Tier 1 - Start Here</p>
+              <h3>Dental, dermatology, cosmetic, physiotherapy</h3>
+              <ul class="feature-list">
+                <li>Appointment-heavy operations with small front-desk teams</li>
+                <li>High treatment values make ROI easier to explain</li>
+                <li>Best fit for 1-5 chair clinics and specialty centers</li>
+              </ul>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Tier 2 - After Validation</p>
+              <h3>Real estate, dealerships, coaching institutes</h3>
+              <ul class="feature-list">
+                <li>Lead-heavy businesses where response speed matters</li>
+                <li>Great fit once the missed-call capture story is proven</li>
+                <li>Site visits, test drives, and inquiry follow-up become the hook</li>
+              </ul>
+            </article>
+            <article class="pricing-card">
+              <p class="landing-card-label">Tier 3 - Scale Later</p>
+              <h3>Salons, spas, gyms, restaurants</h3>
+              <ul class="feature-list">
+                <li>Large market, but lower average ticket size</li>
+                <li>Useful later once pricing and workflow are tightly packaged</li>
+                <li>Better after building a stronger volume-sales motion</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Product Proof</h2>
+          <p>Use these links to demo the system live</p>
         </div>
         <div class="panel-body">
           <ul class="faq-list">
             <li><strong>Dashboard</strong><span><a href="/dashboard">/dashboard</a></span></li>
-            <li><strong>Login</strong><span><a href="/login">/login</a></span></li>
-            <li><strong>Health check</strong><span><a href="/health">/health</a></span></li>
-            <li><strong>GitHub repository</strong><span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span></li>
+            <li><strong>Analytics</strong><span><a href="/analytics">/analytics</a></span></li>
+            <li><strong>Export Center</strong><span><a href="/exports">/exports</a></span></li>
             <li><strong>Product docs</strong><span><a href="/docs">/docs</a></span></li>
-          </ul>
-        </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-header">
-          <h2>FAQ Coverage</h2>
-          <p>Examples of repetitive front-desk questions handled by the current system</p>
-        </div>
-        <div class="panel-body">
-          <ul class="faq-list">
-            {% for item in faqs %}
-              <li><strong>{{ item.question }}</strong><span>{{ item.answer }}</span></li>
-            {% endfor %}
-          </ul>
-        </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-header">
-          <h2>Current Booking Slots</h2>
-          <p>Slots offered to callers during the live voice booking flow</p>
-        </div>
-        <div class="panel-body">
-          <ul class="faq-list">
-            {% for item in slots %}
-              <li><strong>Option {{ item.option }}</strong><span>{{ item.date }} at {{ item.time }}</span></li>
-            {% endfor %}
+            <li><strong>GitHub repository</strong><span><a href="https://github.com/Moonbutter/dentvoice-ai">Moonbutter/dentvoice-ai</a></span></li>
           </ul>
         </div>
       </article>
 
       <article class="panel panel-span-two">
         <div class="panel-header">
-          <h2>Book a Demo / Contact the Builder</h2>
-          <p>Free inbound lead capture for clinics interested in the product</p>
+          <h2>Book a Demo / Start Outreach</h2>
+          <p>Capture real interest from clinics and businesses that want to stop losing calls</p>
         </div>
         <div class="panel-body">
           <form id="contact-form" class="stack-form">
@@ -125,9 +265,28 @@
             </div>
             <div class="split-grid">
               <label><span>Phone number</span><input name="phone_number" required></label>
-              <label><span>What do you want to automate?</span><input name="message" placeholder="Appointments, after-hours calls, reminders..." required></label>
+              <label><span>What do you want to automate?</span><input name="message" placeholder="Missed patient calls, property leads, weekend bookings..." required></label>
             </div>
-            <button type="submit" class="primary-button">Submit Demo Request</button>
+            <div class="split-grid">
+              <label>
+                <span>Preferred plan</span>
+                <select name="preferred_plan">
+                  <option value="Starter">Starter - ₹4,999 / month</option>
+                  <option value="Growth">Growth - ₹9,999 / month</option>
+                  <option value="Multi-Location">Multi-Location - ₹14,999+ / month</option>
+                </select>
+              </label>
+              <label>
+                <span>Preferred payment method</span>
+                <select name="payment_method">
+                  <option value="UPI">UPI</option>
+                  <option value="Bank transfer">Bank transfer</option>
+                  <option value="Invoice with card payment">Invoice with card payment</option>
+                  <option value="Quarterly billing">Quarterly billing</option>
+                </select>
+              </label>
+            </div>
+            <button type="submit" class="primary-button">Request Demo</button>
           </form>
         </div>
       </article>

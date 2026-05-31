@@ -225,9 +225,17 @@ document.getElementById("simulate-call")?.addEventListener("click", async () => 
 document.getElementById("contact-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const message = formData.get("message") || "";
+    const preferredPlan = formData.get("preferred_plan") || "Starter";
+    const paymentMethod = formData.get("payment_method") || "UPI";
+    formData.set(
+      "message",
+      `${message}\nPreferred plan: ${preferredPlan}\nPreferred payment method: ${paymentMethod}`,
+    );
     await postForm("/api/contact-request", formData);
-    event.currentTarget.reset();
+    form.reset();
     showToast("Demo request submitted");
   } catch (error) {
     showToast(error.message, "error");

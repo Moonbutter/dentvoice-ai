@@ -250,6 +250,12 @@ button:hover,
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .single-column {
   grid-template-columns: 1fr;
 }
@@ -269,6 +275,13 @@ button:hover,
 
 .stat-card {
   padding: 22px;
+}
+
+.stat-card span:not(.stat-label):not(.stat-value) {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .stat-card.alert {
@@ -325,6 +338,29 @@ button:hover,
   border-radius: 22px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
+}
+
+.pricing-card {
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow);
+}
+
+.pricing-card h3 {
+  margin: 8px 0 10px;
+  font-size: 1.35rem;
+}
+
+.pricing-card p,
+.pricing-card li {
+  color: var(--muted);
+}
+
+.pricing-card.featured {
+  border-color: rgba(124, 63, 29, 0.3);
+  background: linear-gradient(180deg, rgba(255, 246, 238, 0.96), rgba(255, 255, 255, 0.94));
 }
 
 .filter-panel {
@@ -779,6 +815,7 @@ textarea {
   .hero,
   .stats-grid,
   .wide-stats,
+  .pricing-grid,
   .landing-grid,
   .content-grid,
   .split-grid,
