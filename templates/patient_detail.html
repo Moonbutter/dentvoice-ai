@@ -29,6 +29,14 @@
       <article class="stat-card"><span class="stat-label">Latest Visit</span><strong class="stat-value">{{ patient_detail.profile.latest_visit_date }}</strong></article>
       <article class="stat-card"><span class="stat-label">Completed Visits</span><strong class="stat-value">{{ patient_detail.profile.completed_appointments }}</strong></article>
       <article class="stat-card"><span class="stat-label">Latest Status</span><strong class="stat-value">{{ patient_detail.profile.latest_status.replace("_", " ").title() }}</strong></article>
+      <article class="stat-card"><span class="stat-label">Lifetime Value</span><strong class="stat-value">₹{{ patient_detail.profile.lifetime_value }}</strong></article>
+    </section>
+
+    <section class="kpi-strip top-gap">
+      <div><strong>{{ patient_detail.profile.repeat_visit_score }}/100</strong><span>Repeat visit score</span></div>
+      <div><strong>{{ patient_detail.profile.churn_risk.title() }}</strong><span>Churn risk</span></div>
+      <div><strong>{{ patient_detail.profile.open_tasks }}</strong><span>Open follow-up tasks</span></div>
+      <div><strong>{{ patient_detail.profile.patient_tags or "No tags" }}</strong><span>Patient tags</span></div>
     </section>
 
     <section class="content-grid">

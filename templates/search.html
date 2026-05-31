@@ -21,6 +21,9 @@
         <form method="get" action="/search" class="filter-grid short-filter-grid">
           <label><span>Search everything</span><input name="q" value="{{ search_query }}" placeholder="Patient, clinic, phone, note, FAQ topic"></label>
           <label><span>Segment</span><select name="segment"><option value="">All segments</option>{% for item in search_segments %}<option value="{{ item }}" {% if search_segment == item %}selected{% endif %}>{{ item.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+          <label><span>Business type</span><select name="business_type"><option value="">All</option>{% for item in business_types %}<option value="{{ item }}" {% if search_business_type == item %}selected{% endif %}>{{ industry_templates[item].label }}</option>{% endfor %}</select></label>
+          <label><span>Assigned owner</span><select name="owner"><option value="">Anyone</option>{% for user in assignable_users %}<option value="{{ user.username }}" {% if search_owner == user.username %}selected{% endif %}>{{ user.display_name }}</option>{% endfor %}</select></label>
+          <label><span>Task priority</span><select name="priority"><option value="">Any</option>{% for item in task_priorities %}<option value="{{ item }}" {% if search_priority == item %}selected{% endif %}>{{ item.title() }}</option>{% endfor %}</select></label>
           <button type="submit" class="primary-button">Search</button>
         </form>
       </div>

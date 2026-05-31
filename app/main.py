@@ -389,6 +389,35 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS scheduling_resources (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                resource_type TEXT NOT NULL,
+                resource_name TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS blocked_times (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                blocked_date TEXT NOT NULL,
+                blocked_time TEXT NOT NULL,
+                resource_name TEXT NOT NULL DEFAULT '',
+                reason TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS recurring_rules (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                weekday TEXT NOT NULL,
+                slot_time TEXT NOT NULL,
+                resource_name TEXT NOT NULL DEFAULT '',
+                slot_count INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS app_notifications (
                 id TEXT PRIMARY KEY,
                 clinic_id INTEGER NOT NULL,
@@ -1007,6 +1036,48 @@ def fetch_notifications(clinic_id: int = 1, unread_only: bool = False, limit: in
     return [dict(row) for row in rows]
 
 
+def fetch_scheduling_resources(clinic_id: int = 1) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, resource_type, resource_name, is_active, created_at
+            FROM scheduling_resources
+            WHERE clinic_id = ?
+            ORDER BY resource_type ASC, resource_name ASC
+            """,
+            (clinic_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_blocked_times(clinic_id: int = 1) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, blocked_date, blocked_time, resource_name, reason, created_at
+            FROM blocked_times
+            WHERE clinic_id = ?
+            ORDER BY blocked_date ASC, blocked_time ASC
+            """,
+            (clinic_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_recurring_rules(clinic_id: int = 1) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, weekday, slot_time, resource_name, slot_count, created_at
+            FROM recurring_rules
+            WHERE clinic_id = ?
+            ORDER BY weekday ASC, slot_time ASC
+            """,
+            (clinic_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def fetch_comments(entity_type: str, entity_id: str, clinic_id: int = 1, limit: int = 100) -> list[dict[str, str]]:
     with get_db() as db:
         rows = db.execute(
@@ -1195,6 +1266,18 @@ def fetch_patient_profiles(limit: int = 200, search: str = "", clinic_id: int = 
     for items in grouped.values():
         latest = max(items, key=lambda item: item.created_at)
         notes = [item.notes for item in items if item.notes]
+        completed_items = [item for item in items if item.status == "completed"]
+        total_value = len(completed_items) * int(fetch_clinic_settings(clinic_id).get("avg_booking_value", 5000))
+        latest_visit = datetime.fromisoformat(latest.preferred_date).date()
+        days_since_last_visit = (datetime.now(UTC).date() - latest_visit).days
+        churn_risk = "high" if days_since_last_visit > 90 else "medium" if days_since_last_visit > 45 else "low"
+        tags: list[str] = []
+        if len(items) >= 3:
+            tags.append("repeat_patient")
+        if completed_items:
+            tags.append("converted")
+        if churn_risk == "high":
+            tags.append("follow_up_risk")
         profile = {
             "patient_name": latest.patient_name,
             "phone_number": latest.phone_number,
@@ -1204,6 +1287,10 @@ def fetch_patient_profiles(limit: int = 200, search: str = "", clinic_id: int = 
             "latest_visit_date": latest.preferred_date,
             "latest_reason": latest.reason_for_visit,
             "notes_preview": notes[-1] if notes else "",
+            "lifetime_value": total_value,
+            "repeat_visit_score": min(len(items) * 20, 100),
+            "churn_risk": churn_risk,
+            "patient_tags": ", ".join(tags),
         }
         if search:
             haystack = f"{profile['patient_name']} {profile['phone_number']} {profile['latest_reason']} {profile['notes_preview']}".lower()
@@ -1232,6 +1319,18 @@ def fetch_patient_detail(phone_number: str, clinic_id: int = 1) -> dict[str, obj
     contacts = [item for item in fetch_contact_requests(limit=1000) if item["phone_number"] == phone_number]
     comments = fetch_comments("patient", phone_number, clinic_id=clinic_id)
     latest = appointments[0]
+    completed_appointments = [item for item in appointments if item.status == "completed"]
+    lifetime_value = len(completed_appointments) * int(fetch_clinic_settings(clinic_id).get("avg_booking_value", 5000))
+    latest_visit = datetime.fromisoformat(latest.preferred_date).date()
+    days_since_last_visit = (datetime.now(UTC).date() - latest_visit).days
+    churn_risk = "high" if days_since_last_visit > 90 else "medium" if days_since_last_visit > 45 else "low"
+    profile_tags = []
+    if len(appointments) >= 3:
+        profile_tags.append("repeat_patient")
+    if completed_appointments:
+        profile_tags.append("converted")
+    if churn_risk == "high":
+        profile_tags.append("follow_up_risk")
     timeline = []
     for item in appointments:
         timeline.append({"kind": "appointment", "date": item.created_at, "title": f"{item.reason_for_visit} booked", "detail": f"{item.preferred_date} at {item.preferred_time} · {item.status.replace('_', ' ').title()}"})
@@ -1250,8 +1349,12 @@ def fetch_patient_detail(phone_number: str, clinic_id: int = 1) -> dict[str, obj
             "latest_visit_date": latest.preferred_date,
             "latest_reason": latest.reason_for_visit,
             "notes_preview": latest.notes,
-            "completed_appointments": sum(1 for item in appointments if item.status == "completed"),
+            "completed_appointments": len(completed_appointments),
             "open_tasks": sum(1 for item in tasks if item["status"] != "done"),
+            "lifetime_value": lifetime_value,
+            "repeat_visit_score": min(len(appointments) * 20, 100),
+            "churn_risk": churn_risk,
+            "patient_tags": ", ".join(profile_tags),
         },
         "appointments": appointments,
         "calls": calls,
@@ -1289,17 +1392,43 @@ def fetch_missed_leads(limit: int = 100, search: str = "", lead_score: str = "",
     return records[:limit]
 
 
-def fetch_global_search_results(query: str, clinic_id: int = 1) -> dict[str, list[dict[str, str]]]:
+def fetch_global_search_results(
+    query: str,
+    clinic_id: int = 1,
+    *,
+    business_type: str = "",
+    owner: str = "",
+    priority: str = "",
+) -> dict[str, list[dict[str, str]]]:
     if not query.strip():
-        return {"appointments": [], "calls": [], "patients": [], "leads": [], "tasks": [], "faqs": [], "reminders": []}
+        return {"appointments": [], "calls": [], "patients": [], "leads": [], "tasks": [], "faqs": [], "reminders": [], "comments": []}
 
     appointments = fetch_appointments(limit=8, search=query, clinic_id=clinic_id)
     calls = fetch_call_records(limit=8, search=query, clinic_id=clinic_id)
     patients = fetch_patient_profiles(limit=8, search=query, clinic_id=clinic_id)
     leads = fetch_contact_requests(limit=8, search=query)
-    tasks = fetch_receptionist_tasks(limit=8, search=query, clinic_id=clinic_id)
+    tasks = fetch_receptionist_tasks(limit=50, search=query, priority=priority, clinic_id=clinic_id)
     reminders = [item for item in fetch_reminders(limit=50, clinic_id=clinic_id) if query.lower() in f"{item['patient_name']} {item['phone_number']} {item['note']} {item['reminder_type']}".lower()][:8]
     faqs = [item for item in fetch_faq_entries(limit=50, clinic_id=clinic_id) if query.lower() in f"{item['question']} {item['answer']}".lower()][:8]
+    if business_type:
+        leads = [item for item in leads if item.get("business_type") == business_type]
+    if owner:
+        leads = [item for item in leads if item.get("assignee_username") == owner]
+        tasks = [item for item in tasks if item.get("assignee_username") == owner]
+        reminders = [item for item in reminders if item.get("assignee_username") == owner]
+
+    with get_db() as db:
+        comment_rows = db.execute(
+            """
+            SELECT entity_type, entity_id, author_name, body, created_at
+            FROM comments
+            WHERE clinic_id = ? AND body LIKE ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT 8
+            """,
+            (clinic_id, f"%{query}%"),
+        ).fetchall()
+    comment_results = [dict(row) for row in comment_rows]
 
     return {
         "appointments": [
@@ -1372,6 +1501,16 @@ def fetch_global_search_results(query: str, clinic_id: int = 1) -> dict[str, lis
             }
             for item in reminders
         ],
+        "comments": [
+            {
+                "id": f"{item['entity_type']}:{item['entity_id']}",
+                "title": item["author_name"],
+                "meta": item["entity_type"].replace("_", " ").title(),
+                "detail": item["body"],
+                "href": "/search",
+            }
+            for item in comment_results
+        ],
     }
 
 
@@ -1379,14 +1518,20 @@ def fetch_calendar_entries(clinic_id: int = 1) -> list[dict[str, object]]:
     grouped: dict[str, list[AppointmentRequest]] = defaultdict(list)
     for item in fetch_appointments(limit=1000, clinic_id=clinic_id):
         grouped[item.preferred_date].append(item)
+    blocked_times = fetch_blocked_times(clinic_id)
+    blocked_by_date: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for item in blocked_times:
+        blocked_by_date[str(item["blocked_date"])].append(item)
 
     calendar_rows = []
-    for day, entries in sorted(grouped.items()):
+    for day in sorted(set(grouped.keys()) | set(blocked_by_date.keys())):
+        entries = grouped.get(day, [])
         calendar_rows.append(
             {
                 "date": day,
                 "appointments": sorted(entries, key=lambda item: item.preferred_time),
                 "count": len(entries),
+                "blocked_times": blocked_by_date.get(day, []),
             }
         )
     return calendar_rows
@@ -1396,6 +1541,7 @@ def fetch_calendar_views(clinic_id: int = 1) -> dict[str, object]:
     days = fetch_calendar_entries(clinic_id)
     weekly: dict[str, list[dict[str, object]]] = defaultdict(list)
     monthly: dict[str, dict[str, object]] = {}
+    blocked_count = 0
     for item in days:
         current = datetime.fromisoformat(item["date"]).date()
         week_key = f"{current.isocalendar().year}-W{current.isocalendar().week:02d}"
@@ -1404,7 +1550,15 @@ def fetch_calendar_views(clinic_id: int = 1) -> dict[str, object]:
         monthly.setdefault(month_key, {"month": month_key, "appointments": 0, "days": 0})
         monthly[month_key]["appointments"] += item["count"]
         monthly[month_key]["days"] += 1
-    return {"days": days, "weeks": dict(weekly), "months": list(monthly.values())}
+        blocked_count += len(item.get("blocked_times", []))
+    return {
+        "days": days,
+        "weeks": dict(weekly),
+        "months": list(monthly.values()),
+        "blocked_count": blocked_count,
+        "resources": fetch_scheduling_resources(clinic_id),
+        "recurring_rules": fetch_recurring_rules(clinic_id),
+    }
 
 
 def fetch_analytics(clinic_id: int = 1) -> dict[str, object]:
@@ -1902,6 +2056,16 @@ def build_default_tagline(clinic_name: str, business_type: str) -> str:
 
 def check_double_booking(preferred_date: str, preferred_time: str, *, exclude_appointment_id: str | None = None, clinic_id: int = 1) -> None:
     with get_db() as db:
+        blocked = db.execute(
+            """
+            SELECT id
+            FROM blocked_times
+            WHERE blocked_date = ? AND blocked_time = ? AND clinic_id = ?
+            """,
+            (preferred_date, preferred_time, clinic_id),
+        ).fetchone()
+        if blocked:
+            raise HTTPException(status_code=409, detail="This time is blocked in the clinic calendar.")
         query = """
             SELECT id
             FROM appointments
@@ -2572,12 +2736,21 @@ async def search_page(
     request: Request,
     q: str = Query(default=""),
     segment: str = Query(default=""),
+    business_type: str = Query(default=""),
+    owner: str = Query(default=""),
+    priority: str = Query(default=""),
 ) -> HTMLResponse:
     redirect_response = require_authenticated_page(request)
     if redirect_response:
         return redirect_response
     context = build_dashboard_context(request)
-    search_results = fetch_global_search_results(q, clinic_id=get_active_clinic_id(request))
+    search_results = fetch_global_search_results(
+        q,
+        clinic_id=get_active_clinic_id(request),
+        business_type=business_type,
+        owner=owner,
+        priority=priority,
+    )
     if segment:
         search_results = {key: value for key, value in search_results.items() if key == segment}
     context.update(
@@ -2585,7 +2758,10 @@ async def search_page(
             "page_title": "Global Search",
             "search_query": q,
             "search_segment": segment,
-            "search_segments": ["appointments", "calls", "patients", "leads", "tasks", "faqs", "reminders"],
+            "search_business_type": business_type,
+            "search_owner": owner,
+            "search_priority": priority,
+            "search_segments": ["appointments", "calls", "patients", "leads", "tasks", "faqs", "reminders", "comments"],
             "search_results": search_results,
             "is_authenticated": True,
         }
@@ -3917,6 +4093,72 @@ async def move_calendar_appointment(
         db.execute("UPDATE appointments SET preferred_date = ? WHERE id = ? AND clinic_id = ?", (preferred_date, appointment_id, clinic_id))
         db.commit()
     return JSONResponse({"message": "Appointment moved"})
+
+
+@app.post("/api/calendar/blocked-times")
+async def create_blocked_time(
+    request: Request,
+    blocked_date: str = Form(...),
+    blocked_time: str = Form(...),
+    resource_name: str = Form(default=""),
+    reason: str = Form(default=""),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO blocked_times (id, clinic_id, blocked_date, blocked_time, resource_name, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid4()), clinic_id, blocked_date, blocked_time, resource_name, reason, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    create_notification(clinic_id, "Calendar blocked", f"{blocked_date} {blocked_time} blocked for scheduling.", "/calendar")
+    return JSONResponse({"message": "Blocked time saved"})
+
+
+@app.post("/api/calendar/resources")
+async def create_scheduling_resource(
+    request: Request,
+    resource_type: str = Form(...),
+    resource_name: str = Form(...),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO scheduling_resources (id, clinic_id, resource_type, resource_name, is_active, created_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            """,
+            (str(uuid4()), clinic_id, resource_type, resource_name, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    return JSONResponse({"message": "Scheduling resource added"})
+
+
+@app.post("/api/calendar/recurring-rules")
+async def create_recurring_rule(
+    request: Request,
+    weekday: str = Form(...),
+    slot_time: str = Form(...),
+    resource_name: str = Form(default=""),
+    slot_count: int = Form(default=1),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO recurring_rules (id, clinic_id, weekday, slot_time, resource_name, slot_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid4()), clinic_id, weekday, slot_time, resource_name, max(slot_count, 1), datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    create_notification(clinic_id, "Recurring schedule added", f"{weekday} at {slot_time} added to recurring availability.", "/calendar")
+    return JSONResponse({"message": "Recurring rule added"})
 
 
 @app.get("/api/export/appointments.csv")

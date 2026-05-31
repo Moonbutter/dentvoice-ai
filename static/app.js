@@ -552,6 +552,39 @@ document.getElementById("slot-form")?.addEventListener("submit", async (event) =
   }
 });
 
+document.getElementById("blocked-time-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/calendar/blocked-times", formData);
+    refreshPage("Blocked time saved");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("calendar-resource-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/calendar/resources", formData);
+    refreshPage("Scheduling resource added");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("recurring-rule-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/calendar/recurring-rules", formData);
+    refreshPage("Recurring rule added");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 document.querySelectorAll(".slot-delete").forEach((button) => {
   button.addEventListener("click", async () => {
     try {

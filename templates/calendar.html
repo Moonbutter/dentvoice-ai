@@ -19,6 +19,63 @@
       {% for item in calendar_views.months %}
         <article class="stat-card"><span class="stat-label">{{ item.month }}</span><strong class="stat-value">{{ item.appointments }}</strong><span>{{ item.days }} busy day(s)</span></article>
       {% endfor %}
+      <article class="stat-card alert"><span class="stat-label">Blocked Times</span><strong class="stat-value">{{ calendar_views.blocked_count }}</strong><span>Protected slots across the active calendar</span></article>
+    </section>
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>Block Time</h2><p>Reserve slots for surgery, lunch, doctor meetings, or unavailable chairs</p></div>
+        <div class="panel-body">
+          <form id="blocked-time-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Date</span><input type="date" name="blocked_date" required></label>
+              <label><span>Time</span><input name="blocked_time" placeholder="02:00 PM" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Resource</span><input name="resource_name" placeholder="Chair 1 / Dr. Sharma / Room A"></label>
+              <label><span>Reason</span><input name="reason" placeholder="Implant surgery block"></label>
+            </div>
+            <button type="submit" class="primary-button">Save Blocked Time</button>
+          </form>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Scheduling Resources</h2><p>Simulate providers, rooms, and chairs for a more realistic clinic calendar</p></div>
+        <div class="panel-body">
+          <form id="calendar-resource-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Resource type</span><select name="resource_type"><option value="provider">Provider</option><option value="chair">Chair</option><option value="room">Room</option></select></label>
+              <label><span>Resource name</span><input name="resource_name" placeholder="Dr. Shah / Chair 2 / Aesthetic Room" required></label>
+            </div>
+            <button type="submit" class="secondary-button">Add Resource</button>
+          </form>
+          <ul class="faq-list top-gap-inline">
+            {% for item in calendar_views.resources %}
+              <li><div><strong>{{ item.resource_name }}</strong><span>{{ item.resource_type.replace("_", " ").title() }}</span></div></li>
+            {% else %}
+              <li><div><span>No scheduling resources added yet.</span></div></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Recurring Availability Rules</h2><p>Simulate weekly recurring openings for chairs, providers, or therapy slots</p></div>
+        <div class="panel-body">
+          <form id="recurring-rule-form" class="filter-grid short-filter-grid">
+            <label><span>Weekday</span><select name="weekday"><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Saturday">Saturday</option><option value="Sunday">Sunday</option></select></label>
+            <label><span>Time</span><input name="slot_time" placeholder="11:00 AM" required></label>
+            <label><span>Resource</span><input name="resource_name" placeholder="Chair 1 / Dr. Shah"></label>
+            <label><span>Slot count</span><input type="number" name="slot_count" value="1" min="1" max="12"></label>
+            <button type="submit" class="primary-button">Add Recurring Rule</button>
+          </form>
+          <ul class="faq-list top-gap-inline">
+            {% for item in calendar_views.recurring_rules %}
+              <li><div><strong>{{ item.weekday }} · {{ item.slot_time }}</strong><span>{{ item.slot_count }} recurring slot(s){% if item.resource_name %} · {{ item.resource_name }}{% endif %}</span></div></li>
+            {% else %}
+              <li><div><span>No recurring rules yet.</span></div></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
     </section>
     <section class="content-grid">
       <article class="panel panel-span-two">
@@ -29,7 +86,7 @@
               <strong>{{ week }}</strong>
               <ul class="faq-list top-gap-inline">
                 {% for day in items %}
-                  <li><div><strong>{{ day.date }}</strong><span>{{ day.count }} appointment(s)</span></div></li>
+                  <li><div><strong>{{ day.date }}</strong><span>{{ day.count }} appointment(s){% if day.blocked_times %} · {{ day.blocked_times|length }} blocked{% endif %}</span></div></li>
                 {% endfor %}
               </ul>
             </div>
@@ -48,6 +105,12 @@
                   <li>
                     <div class="draggable-appointment" draggable="true" data-appointment-id="{{ item.id }}"><strong>{{ item.preferred_time }} - {{ item.patient_name }}</strong><span>{{ item.reason_for_visit }}</span></div>
                     <div class="record-meta"><span>{{ item.phone_number }}</span><span class="pill">{{ item.status.replace("_", " ").title() }}</span></div>
+                  </li>
+                {% endfor %}
+                {% for block in day.blocked_times %}
+                  <li>
+                    <div><strong>{{ block.blocked_time }} - Blocked</strong><span>{{ block.reason or "Reserved time" }}{% if block.resource_name %} · {{ block.resource_name }}{% endif %}</span></div>
+                    <div class="record-meta"><span class="pill urgent">Blocked</span></div>
                   </li>
                 {% endfor %}
               </ul>

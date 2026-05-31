@@ -20,6 +20,7 @@
         <form method="get" action="/patients" class="filter-grid short-filter-grid">
           <label><span>Search patient</span><input name="q" value="{{ filters.q }}" placeholder="Name, phone, notes"></label>
           <label><span>Sort</span><select name="sort"><option value="latest_desc" {% if filters.sort == "latest_desc" %}selected{% endif %}>Latest visit</option><option value="visits_desc" {% if filters.sort == "visits_desc" %}selected{% endif %}>Most visits</option><option value="name_asc" {% if filters.sort == "name_asc" %}selected{% endif %}>Name A-Z</option></select></label>
+          <label><span>Insight focus</span><select disabled><option>Lifetime value + churn risk active</option></select></label>
           <button type="submit" class="primary-button">Search</button>
         </form>
       </div>
@@ -33,6 +34,9 @@
             <span class="muted-line">{{ item.phone_number }}</span>
             <span class="muted-line">{{ item.appointment_count }} appointment(s)</span>
             <span class="muted-line">Latest visit: {{ item.latest_visit_date }}</span>
+            <span class="muted-line">Estimated lifetime value: ₹{{ item.lifetime_value }}</span>
+            <span class="muted-line">Repeat visit score: {{ item.repeat_visit_score }}/100 · Churn risk: {{ item.churn_risk.title() }}</span>
+            {% if item.patient_tags %}<span class="muted-line">Tags: {{ item.patient_tags }}</span>{% endif %}
             {% if item.notes_preview %}<span class="muted-line">Note: {{ item.notes_preview }}</span>{% endif %}
             <div class="top-gap-inline"><a class="link-inline" href="/patients/detail?phone={{ item.patient_query }}">Open patient detail</a></div>
           </div>

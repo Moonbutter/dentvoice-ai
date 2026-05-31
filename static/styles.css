@@ -23,7 +23,9 @@ body {
   background:
     radial-gradient(circle at top left, rgba(201, 107, 59, 0.18), transparent 28%),
     radial-gradient(circle at top right, rgba(20, 108, 120, 0.18), transparent 24%),
+    radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.36), transparent 24%),
     linear-gradient(180deg, #fbf7f2 0%, var(--bg) 100%);
+  background-attachment: fixed;
 }
 
 .brand-lockup {
@@ -278,6 +280,28 @@ button:hover,
   background: var(--paper);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.stat-card::before,
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 38%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 28%);
+  pointer-events: none;
+}
+
+.stat-card:hover,
+.panel:hover {
+  transform: translateY(-4px) rotateX(1deg) rotateY(-1deg);
+  box-shadow: 0 28px 58px rgba(71, 46, 27, 0.16);
+  border-color: rgba(20, 108, 120, 0.24);
 }
 
 .stat-card {
@@ -792,6 +816,15 @@ textarea {
   border-radius: 22px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 28px rgba(57, 40, 29, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.task-card:hover,
+.card-form:hover,
+.pricing-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 36px rgba(57, 40, 29, 0.12);
 }
 
 .task-card-top {
@@ -854,6 +887,24 @@ textarea {
 
 .link-inline:hover {
   text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero,
+  .landing-hero {
+    animation: floatIn 420ms ease;
+  }
+}
+
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toast {
