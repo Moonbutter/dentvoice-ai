@@ -60,8 +60,25 @@
       </article>
     </section>
 
+    <section class="panel setup-wizard-shell">
+      <div class="panel-header">
+        <h2>Guided Launch Wizard</h2>
+        <p>Move step by step until the workspace is ready to sell and ready to demo</p>
+      </div>
+      <div class="panel-body">
+        <div class="wizard-meta">
+          <span class="pill">Step <span id="wizard-current-step">1</span> of <span id="wizard-total-steps">7</span></span>
+          <span class="muted-line">Current focus: <span id="wizard-step-label">Industry Template</span></span>
+        </div>
+        <div class="wizard-controls top-gap-inline">
+          <button type="button" class="secondary-button" id="wizard-back">Back</button>
+          <button type="button" class="secondary-button" id="wizard-next">Next</button>
+        </div>
+      </div>
+    </section>
+
     <section class="content-grid">
-      <article class="panel panel-span-two" id="template-library">
+      <article class="panel panel-span-two wizard-step" id="template-library" data-wizard-step data-step-label="Industry Template">
         <div class="panel-header">
           <h2>Industry Template Library</h2>
           <p>Pick the closest vertical to preload the right copy, hours, FAQs, and benchmark value</p>
@@ -85,7 +102,7 @@
         </div>
       </article>
 
-      <article class="panel panel-span-two">
+      <article class="panel panel-span-two wizard-step" data-wizard-step data-step-label="Workspace Checklist">
         <div class="panel-header">
           <h2>Workspace Checklist</h2>
           <p>Follow this order to make the workspace look production-ready</p>
@@ -121,7 +138,7 @@
         </div>
       </article>
 
-      <article class="panel">
+      <article class="panel wizard-step" data-wizard-step data-step-label="Branding and Availability">
         <div class="panel-header">
           <h2>Branding and Availability</h2>
           <p>Set the public-facing clinic identity and working schedule</p>
@@ -155,7 +172,7 @@
         </div>
       </article>
 
-      <article class="panel">
+      <article class="panel wizard-step" data-wizard-step data-step-label="Booking Slots">
         <div class="panel-header">
           <h2>Add Booking Slots</h2>
           <p>Make sure the receptionist always has a few live options to offer</p>
@@ -179,7 +196,7 @@
         </div>
       </article>
 
-      <article class="panel panel-span-two" id="faq-manager">
+      <article class="panel panel-span-two wizard-step" id="faq-manager" data-wizard-step data-step-label="FAQ Starter Pack">
         <div class="panel-header">
           <h2>FAQ Starter Pack</h2>
           <p>Teach the receptionist how this clinic answers common questions</p>
@@ -232,7 +249,7 @@
         </div>
       </article>
 
-      <article class="panel">
+      <article class="panel wizard-step" data-wizard-step data-step-label="Demo Preset">
         <div class="panel-header">
           <h2>Load Demo Preset</h2>
           <p>Create a realistic first booking + call flow for the selected industry</p>
@@ -245,7 +262,7 @@
         </div>
       </article>
 
-      <article class="panel panel-span-two">
+      <article class="panel panel-span-two wizard-step" data-wizard-step data-step-label="Automation Rules">
         <div class="panel-header">
           <h2>Workflow Automation Rules</h2>
           <p>Free no-code logic for tasks, reminders, and internal notifications</p>

@@ -25,6 +25,18 @@
       </div>
     </section>
 
+    <section class="panel filter-panel">
+      <div class="panel-header"><h2>Bulk Reminder Actions</h2><p>Assign or update queue state across multiple reminders</p></div>
+      <div class="panel-body">
+        <form id="reminder-bulk-form" class="filter-grid short-filter-grid">
+          <input type="hidden" name="reminder_ids" value="">
+          <label><span>Status</span><select name="status"><option value="">Keep current</option><option value="pending">Pending</option><option value="ready">Ready</option><option value="sent">Sent</option><option value="cancelled">Cancelled</option></select></label>
+          <label><span>Assign to</span><select name="assignee_username"><option value="">Keep current</option>{% for user in assignable_users %}<option value="{{ user.username }}">{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
+          <button type="submit" class="primary-button">Apply Bulk Update</button>
+        </form>
+      </div>
+    </section>
+
     <section class="content-grid">
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Upcoming Candidates</h2><p>Create reminders for active appointments that still need patient communication</p></div>
@@ -62,12 +74,17 @@
               {% for item in reminders %}
                 <form class="reminder-update-form task-card" data-reminder-id="{{ item.id }}">
                   <div class="task-card-top">
-                    <strong>{{ item.patient_name }}</strong>
+                    <div>
+                      <label class="checkbox-row inline-checkbox"><input type="checkbox" class="bulk-select-checkbox reminder-select-checkbox" value="{{ item.id }}"> <span>Select</span></label>
+                      <strong>{{ item.patient_name }}</strong>
+                    </div>
                     <span class="pill">{{ item.status.title() }}</span>
                   </div>
                   <span class="muted-line">{{ item.phone_number }}</span>
                   <span class="muted-line">{{ item.reminder_type.replace("_", " ").title() }} · {{ item.scheduled_for }}</span>
+                  {% if item.assignee_username %}<span class="muted-line">Owner: {{ item.assignee_username }}</span>{% endif %}
                   <label><span>Status</span><select name="status"><option value="pending" {% if item.status == 'pending' %}selected{% endif %}>Pending</option><option value="ready" {% if item.status == 'ready' %}selected{% endif %}>Ready</option><option value="sent" {% if item.status == 'sent' %}selected{% endif %}>Sent</option><option value="cancelled" {% if item.status == 'cancelled' %}selected{% endif %}>Cancelled</option></select></label>
+                  <label><span>Assigned owner</span><select name="assignee_username"><option value="">Unassigned</option>{% for user in assignable_users %}<option value="{{ user.username }}" {% if item.assignee_username == user.username %}selected{% endif %}>{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
                   <label><span>Note</span><textarea name="note" rows="3">{{ item.note }}</textarea></label>
                   <button type="submit" class="secondary-button">Save Reminder</button>
                 </form>

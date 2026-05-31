@@ -146,6 +146,91 @@ function renderSavedFilters(form, key) {
   });
 }
 
+function collectSelectedIds(selector) {
+  return Array.from(document.querySelectorAll(selector))
+    .filter((input) => input.checked)
+    .map((input) => input.value);
+}
+
+function bindBulkForm({ formId, checkboxSelector, endpoint, successMessage }) {
+  const form = document.getElementById(formId);
+  if (!form) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const ids = collectSelectedIds(checkboxSelector);
+      if (!ids.length) {
+        throw new Error("Select at least one record first.");
+      }
+      const formData = new FormData(form);
+      const hiddenInput = form.querySelector('input[type="hidden"]');
+      if (hiddenInput) {
+        hiddenInput.value = ids.join(",");
+      }
+      await postForm(endpoint, formData);
+      refreshPage(successMessage);
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+}
+
+function setupOnboardingWizard() {
+  const steps = Array.from(document.querySelectorAll("[data-wizard-step]"));
+  if (!steps.length) {
+    return;
+  }
+
+  let index = 0;
+  const currentNode = document.getElementById("wizard-current-step");
+  const totalNode = document.getElementById("wizard-total-steps");
+  const labelNode = document.getElementById("wizard-step-label");
+  const backButton = document.getElementById("wizard-back");
+  const nextButton = document.getElementById("wizard-next");
+
+  if (totalNode) {
+    totalNode.textContent = String(steps.length);
+  }
+
+  function render() {
+    steps.forEach((step, stepIndex) => {
+      step.hidden = stepIndex !== index;
+      step.classList.toggle("wizard-step-active", stepIndex === index);
+    });
+    if (currentNode) {
+      currentNode.textContent = String(index + 1);
+    }
+    if (labelNode) {
+      labelNode.textContent = steps[index]?.dataset.stepLabel || `Step ${index + 1}`;
+    }
+    if (backButton) {
+      backButton.disabled = index === 0;
+    }
+    if (nextButton) {
+      nextButton.disabled = index === steps.length - 1;
+    }
+  }
+
+  backButton?.addEventListener("click", () => {
+    if (index > 0) {
+      index -= 1;
+      render();
+    }
+  });
+
+  nextButton?.addEventListener("click", () => {
+    if (index < steps.length - 1) {
+      index += 1;
+      render();
+    }
+  });
+
+  render();
+}
+
 function setupSavedFilters() {
   document.querySelectorAll("form[data-save-filters]").forEach((form) => {
     const key = form.dataset.saveFilters;
@@ -601,6 +686,21 @@ document.getElementById("announcement-form")?.addEventListener("submit", async (
   }
 });
 
+document.getElementById("lead-auto-assign")?.addEventListener("click", async () => {
+  try {
+    const ids = collectSelectedIds(".lead-select-checkbox");
+    if (!ids.length) {
+      throw new Error("Select at least one lead first.");
+    }
+    const formData = new FormData();
+    formData.set("request_ids", ids.join(","));
+    await postForm("/api/contact-requests/auto-assign", formData);
+    refreshPage("Selected leads auto-assigned");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 document.getElementById("referral-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -742,3 +842,22 @@ document.querySelectorAll(".calendar-dropzone").forEach((zone) => {
 });
 
 setupSavedFilters();
+setupOnboardingWizard();
+bindBulkForm({
+  formId: "lead-bulk-form",
+  checkboxSelector: ".lead-select-checkbox",
+  endpoint: "/api/contact-requests/bulk-update",
+  successMessage: "Lead bulk update applied",
+});
+bindBulkForm({
+  formId: "task-bulk-form",
+  checkboxSelector: ".task-select-checkbox",
+  endpoint: "/api/receptionist-tasks/bulk-update",
+  successMessage: "Task bulk update applied",
+});
+bindBulkForm({
+  formId: "reminder-bulk-form",
+  checkboxSelector: ".reminder-select-checkbox",
+  endpoint: "/api/reminders/bulk-update",
+  successMessage: "Reminder bulk update applied",
+});

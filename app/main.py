@@ -199,6 +199,7 @@ TASK_STATUSES = ["open", "in_progress", "done"]
 TASK_PRIORITIES = ["high", "medium", "low"]
 APPOINTMENT_SOURCES = ["admin", "voice_call", "simulated_call", "api"]
 CONTACT_STATUSES = ["new", "contacted", "qualified", "demo_booked", "trial_active", "paid", "closed"]
+TEAM_ROLES = ["admin", "manager", "receptionist"]
 BUSINESS_TYPES = list(INDUSTRY_TEMPLATES.keys())
 
 call_sessions: dict[str, CallSession] = {}
@@ -339,6 +340,8 @@ def init_db() -> None:
                 phone_number TEXT NOT NULL,
                 message TEXT NOT NULL,
                 tags TEXT NOT NULL DEFAULT '',
+                assignee_username TEXT NOT NULL DEFAULT '',
+                lost_reason TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL
             );
 
@@ -368,6 +371,7 @@ def init_db() -> None:
                 status TEXT NOT NULL,
                 priority TEXT NOT NULL DEFAULT 'medium',
                 tags TEXT NOT NULL DEFAULT '',
+                assignee_username TEXT NOT NULL DEFAULT '',
                 related_appointment_id TEXT,
                 created_at TEXT NOT NULL
             );
@@ -381,6 +385,7 @@ def init_db() -> None:
                 scheduled_for TEXT NOT NULL,
                 status TEXT NOT NULL,
                 note TEXT NOT NULL,
+                assignee_username TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL
             );
 
@@ -500,15 +505,23 @@ def init_db() -> None:
             db.execute("ALTER TABLE contact_requests ADD COLUMN business_type TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "contact_requests", "tags"):
             db.execute("ALTER TABLE contact_requests ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "contact_requests", "assignee_username"):
+            db.execute("ALTER TABLE contact_requests ADD COLUMN assignee_username TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "contact_requests", "lost_reason"):
+            db.execute("ALTER TABLE contact_requests ADD COLUMN lost_reason TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "receptionist_tasks", "priority"):
             db.execute("ALTER TABLE receptionist_tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'")
         if not column_exists(db, "receptionist_tasks", "tags"):
             db.execute("ALTER TABLE receptionist_tasks ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "receptionist_tasks", "assignee_username"):
+            db.execute("ALTER TABLE receptionist_tasks ADD COLUMN assignee_username TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "call_records", "internal_notes"):
             db.execute("ALTER TABLE call_records ADD COLUMN internal_notes TEXT NOT NULL DEFAULT ''")
         for table_name in ["appointments", "call_records", "whatsapp_messages", "slots", "audit_logs", "receptionist_tasks", "reminder_queue", "faq_entries"]:
             if not column_exists(db, table_name, "clinic_id"):
                 db.execute(f"ALTER TABLE {table_name} ADD COLUMN clinic_id INTEGER NOT NULL DEFAULT 1")
+        if not column_exists(db, "reminder_queue", "assignee_username"):
+            db.execute("ALTER TABLE reminder_queue ADD COLUMN assignee_username TEXT NOT NULL DEFAULT ''")
 
         existing_settings = db.execute("SELECT COUNT(*) AS count FROM clinic_settings").fetchone()["count"]
         if existing_settings == 0:
@@ -865,7 +878,7 @@ def fetch_contact_requests(limit: int = 20, search: str = "", status: str = "", 
         order_clause = "ORDER BY name ASC"
 
     query = f"""
-        SELECT id, name, clinic_name, phone_number, message, status, owner_notes, business_type, tags, created_at
+        SELECT id, name, clinic_name, phone_number, message, status, owner_notes, business_type, tags, assignee_username, lost_reason, created_at
         FROM contact_requests
         {where_clause}
         {order_clause}
@@ -890,6 +903,27 @@ def fetch_clinic_users(clinic_id: int = 1) -> list[dict[str, object]]:
             (clinic_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def fetch_assignable_users(clinic_id: int = 1) -> list[dict[str, object]]:
+    return [user for user in fetch_clinic_users(clinic_id) if bool(user["is_active"]) and str(user["role"]) in {"manager", "receptionist"}]
+
+
+def suggest_lead_assignee(clinic_id: int = 1) -> str:
+    candidates = fetch_assignable_users(clinic_id)
+    if not candidates:
+        return ""
+
+    current_load: Counter[str] = Counter()
+    for item in fetch_contact_requests(limit=1000):
+        if item.get("assignee_username") and item.get("status") not in {"paid", "closed"}:
+            current_load[str(item["assignee_username"])] += 1
+    for item in fetch_receptionist_tasks(limit=1000, clinic_id=clinic_id):
+        if item.get("assignee_username") and item.get("status") != "done":
+            current_load[str(item["assignee_username"])] += 1
+
+    candidates.sort(key=lambda user: (current_load[str(user["username"])], str(user["display_name"]).lower()))
+    return str(candidates[0]["username"])
 
 
 def fetch_onboarding_state(clinic_id: int = 1) -> set[str]:
@@ -1064,7 +1098,7 @@ def fetch_receptionist_tasks(limit: int = 100, status: str = "", search: str = "
 
     where_clause = f"WHERE {' AND '.join(conditions)}"
     query = f"""
-        SELECT id, patient_name, phone_number, note, due_date, status, priority, tags, related_appointment_id, created_at
+        SELECT id, patient_name, phone_number, note, due_date, status, priority, tags, assignee_username, related_appointment_id, created_at
         FROM receptionist_tasks
         {where_clause}
         ORDER BY
@@ -1102,7 +1136,7 @@ def fetch_reminders(limit: int = 200, status: str = "", clinic_id: int = 1) -> l
 
     where_clause = f"WHERE {' AND '.join(conditions)}"
     query = f"""
-        SELECT id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, created_at
+        SELECT id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, assignee_username, created_at
         FROM reminder_queue
         {where_clause}
         ORDER BY
@@ -1817,6 +1851,12 @@ def require_admin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Only admin users can perform this action.")
 
 
+def require_manager_or_admin(request: Request) -> None:
+    require_authenticated_api(request)
+    if get_current_role(request) not in {"admin", "manager"}:
+        raise HTTPException(status_code=403, detail="Only admin or manager users can perform this action.")
+
+
 def valid_hex_color(value: str) -> bool:
     if len(value) != 7 or not value.startswith("#"):
         return False
@@ -2281,6 +2321,7 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "business_types": BUSINESS_TYPES,
         "analytics": analytics,
         "team_users": fetch_clinic_users(active_clinic_id),
+        "assignable_users": fetch_assignable_users(active_clinic_id),
         "notification_center": fetch_notifications(active_clinic_id, limit=100),
         "unread_notification_count": len(fetch_notifications(active_clinic_id, unread_only=True, limit=100)),
         "referrals": fetch_referrals(active_clinic_id),
@@ -2309,8 +2350,9 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "task_statuses": TASK_STATUSES,
         "task_priorities": TASK_PRIORITIES,
         "contact_statuses": CONTACT_STATUSES,
+        "team_roles": TEAM_ROLES,
         "current_role": current_role,
-        "dashboard_variant": "admin" if current_role == "admin" else "receptionist",
+        "dashboard_variant": current_role if current_role in {"admin", "manager", "receptionist"} else "receptionist",
         "session_display_name": request.session.get("dentvoice_display_name") if request else "",
         "session_username": request.session.get("dentvoice_username") if request else "",
         "asset_version": ASSET_VERSION,
@@ -2816,11 +2858,12 @@ async def create_trial_signup(
     )
     request_id = str(uuid4())
     created_at = datetime.now(UTC).isoformat()
+    auto_assignee = suggest_lead_assignee(int(workspace["clinic_id"]))
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, status, owner_notes, business_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, status, owner_notes, business_type, assignee_username)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request_id,
@@ -2832,6 +2875,7 @@ async def create_trial_signup(
                 "trial_active",
                 "Auto-created from public self-serve signup.",
                 business_type,
+                auto_assignee,
             ),
         )
         db.commit()
@@ -2868,13 +2912,14 @@ async def create_contact_request(
 ) -> JSONResponse:
     request_id = str(uuid4())
     created_at = datetime.now(UTC).isoformat()
+    auto_assignee = suggest_lead_assignee(1)
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, business_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, business_type, assignee_username)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (request_id, name, clinic_name, phone_number, message, created_at, business_type),
+            (request_id, name, clinic_name, phone_number, message, created_at, business_type, auto_assignee),
         )
         db.commit()
     apply_automation_rules(
@@ -2898,16 +2943,18 @@ async def update_contact_request(
     status: str = Form(...),
     owner_notes: str = Form(default=""),
     tags: str = Form(default=""),
+    assignee_username: str = Form(default=""),
+    lost_reason: str = Form(default=""),
 ) -> JSONResponse:
-    require_authenticated_api(request)
+    require_manager_or_admin(request)
     with get_db() as db:
         result = db.execute(
             """
             UPDATE contact_requests
-            SET status = ?, owner_notes = ?, tags = ?
+            SET status = ?, owner_notes = ?, tags = ?, assignee_username = ?, lost_reason = ?
             WHERE id = ?
             """,
-            (status, owner_notes, tags, request_id),
+            (status, owner_notes, tags, assignee_username, lost_reason, request_id),
         )
         db.commit()
         if result.rowcount == 0:
@@ -2921,7 +2968,7 @@ async def update_contact_request(
 
 @app.post("/api/contact-requests/{request_id}/stage")
 async def update_contact_request_stage(request: Request, request_id: str, status: str = Form(...)) -> JSONResponse:
-    require_authenticated_api(request)
+    require_manager_or_admin(request)
     with get_db() as db:
         result = db.execute("UPDATE contact_requests SET status = ? WHERE id = ?", (status, request_id))
         db.commit()
@@ -2932,6 +2979,74 @@ async def update_contact_request_stage(request: Request, request_id: str, status
     log_audit("update", "contact_request", request_id, f"Moved lead to {status}.", clinic_id=clinic_id)
     log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "lead_updated", f"{request_id}:{status}")
     return JSONResponse({"message": "Lead stage updated"})
+
+
+@app.post("/api/contact-requests/bulk-update")
+async def bulk_update_contact_requests(
+    request: Request,
+    request_ids: str = Form(...),
+    status: str = Form(default=""),
+    assignee_username: str = Form(default=""),
+    tags: str = Form(default=""),
+    lost_reason: str = Form(default=""),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    lead_ids = [item.strip() for item in request_ids.split(",") if item.strip()]
+    if not lead_ids:
+        raise HTTPException(status_code=400, detail="Select at least one lead.")
+
+    fields: list[str] = []
+    params: list[object] = []
+    if status:
+        fields.append("status = ?")
+        params.append(status)
+    if assignee_username:
+        fields.append("assignee_username = ?")
+        params.append(assignee_username)
+    if tags:
+        fields.append("tags = ?")
+        params.append(tags)
+    if lost_reason:
+        fields.append("lost_reason = ?")
+        params.append(lost_reason)
+    if not fields:
+        raise HTTPException(status_code=400, detail="Choose at least one bulk update action.")
+
+    placeholders = ",".join("?" for _ in lead_ids)
+    with get_db() as db:
+        db.execute(
+            f"UPDATE contact_requests SET {', '.join(fields)} WHERE id IN ({placeholders})",
+            [*params, *lead_ids],
+        )
+        db.commit()
+    clinic_id = get_active_clinic_id(request)
+    create_notification(clinic_id, "Bulk lead update", f"Updated {len(lead_ids)} lead record(s).", "/leads")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "bulk_lead_update", ",".join(lead_ids[:5]))
+    return JSONResponse({"message": f"Updated {len(lead_ids)} lead(s)."})
+
+
+@app.post("/api/contact-requests/auto-assign")
+async def auto_assign_contact_requests(request: Request, request_ids: str = Form(...)) -> JSONResponse:
+    require_manager_or_admin(request)
+    lead_ids = [item.strip() for item in request_ids.split(",") if item.strip()]
+    if not lead_ids:
+        raise HTTPException(status_code=400, detail="Select at least one lead.")
+
+    clinic_id = get_active_clinic_id(request)
+    assignee = suggest_lead_assignee(clinic_id)
+    if not assignee:
+        raise HTTPException(status_code=400, detail="No active manager or receptionist available for assignment.")
+
+    placeholders = ",".join("?" for _ in lead_ids)
+    with get_db() as db:
+        db.execute(
+            f"UPDATE contact_requests SET assignee_username = ? WHERE id IN ({placeholders})",
+            [assignee, *lead_ids],
+        )
+        db.commit()
+    create_notification(clinic_id, "Lead auto-assigned", f"{len(lead_ids)} lead(s) assigned to {assignee}.", "/leads")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "lead_auto_assigned", assignee)
+    return JSONResponse({"message": f"Assigned {len(lead_ids)} lead(s) to {assignee}."})
 
 
 @app.post("/api/faqs")
@@ -3374,6 +3489,7 @@ async def create_receptionist_task(
     status: str = Form(default="open"),
     priority: str = Form(default="medium"),
     tags: str = Form(default=""),
+    assignee_username: str = Form(default=""),
     related_appointment_id: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
@@ -3382,8 +3498,8 @@ async def create_receptionist_task(
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, related_appointment_id, created_at, clinic_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, assignee_username, related_appointment_id, created_at, clinic_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_id,
@@ -3394,6 +3510,7 @@ async def create_receptionist_task(
                 status,
                 priority,
                 tags,
+                assignee_username,
                 related_appointment_id or None,
                 datetime.now(UTC).isoformat(),
                 clinic_id,
@@ -3416,6 +3533,7 @@ async def create_missed_lead_task(
     due_date: str = Form(...),
     priority: str = Form(default="high"),
     tags: str = Form(default="missed_lead"),
+    assignee_username: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
     clinic_id = get_active_clinic_id(request)
@@ -3426,10 +3544,10 @@ async def create_missed_lead_task(
             raise HTTPException(status_code=404, detail="Call not found")
         db.execute(
             """
-            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, related_appointment_id, created_at, clinic_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, assignee_username, related_appointment_id, created_at, clinic_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (task_id, patient_name, phone_number, note, due_date, "open", priority, tags, None, datetime.now(UTC).isoformat(), clinic_id),
+            (task_id, patient_name, phone_number, note, due_date, "open", priority, tags, assignee_username, None, datetime.now(UTC).isoformat(), clinic_id),
         )
         db.commit()
     log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "task_created", patient_name)
@@ -3446,6 +3564,7 @@ async def update_receptionist_task(
     status: str = Form(...),
     priority: str = Form(default="medium"),
     tags: str = Form(default=""),
+    assignee_username: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
     clinic_id = get_active_clinic_id(request)
@@ -3453,10 +3572,10 @@ async def update_receptionist_task(
         result = db.execute(
             """
             UPDATE receptionist_tasks
-            SET note = ?, due_date = ?, status = ?, priority = ?, tags = ?
+            SET note = ?, due_date = ?, status = ?, priority = ?, tags = ?, assignee_username = ?
             WHERE id = ? AND clinic_id = ?
             """,
-            (note, due_date, status, priority, tags, task_id, clinic_id),
+            (note, due_date, status, priority, tags, assignee_username, task_id, clinic_id),
         )
         db.commit()
         if result.rowcount == 0:
@@ -3465,6 +3584,46 @@ async def update_receptionist_task(
     log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), action_name, task_id)
     log_audit("update", "receptionist_task", task_id, f"Updated receptionist task to {status}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Receptionist task updated"})
+
+
+@app.post("/api/receptionist-tasks/bulk-update")
+async def bulk_update_receptionist_tasks(
+    request: Request,
+    task_ids: str = Form(...),
+    status: str = Form(default=""),
+    priority: str = Form(default=""),
+    assignee_username: str = Form(default=""),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    ids = [item.strip() for item in task_ids.split(",") if item.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="Select at least one task.")
+
+    fields: list[str] = []
+    params: list[object] = []
+    if status:
+        fields.append("status = ?")
+        params.append(status)
+    if priority:
+        fields.append("priority = ?")
+        params.append(priority)
+    if assignee_username:
+        fields.append("assignee_username = ?")
+        params.append(assignee_username)
+    if not fields:
+        raise HTTPException(status_code=400, detail="Choose at least one bulk update action.")
+
+    placeholders = ",".join("?" for _ in ids)
+    with get_db() as db:
+        db.execute(
+            f"UPDATE receptionist_tasks SET {', '.join(fields)} WHERE clinic_id = ? AND id IN ({placeholders})",
+            [*params, clinic_id, *ids],
+        )
+        db.commit()
+    create_notification(clinic_id, "Bulk task update", f"Updated {len(ids)} task(s).", "/inbox")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "bulk_task_update", ",".join(ids[:5]))
+    return JSONResponse({"message": f"Updated {len(ids)} task(s)."})
 
 
 @app.post("/api/reminders")
@@ -3476,6 +3635,7 @@ async def create_reminder(
     reminder_type: str = Form(...),
     scheduled_for: str = Form(...),
     note: str = Form(default=""),
+    assignee_username: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
     clinic_id = get_active_clinic_id(request)
@@ -3483,10 +3643,10 @@ async def create_reminder(
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO reminder_queue (id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, created_at, clinic_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO reminder_queue (id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, assignee_username, created_at, clinic_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (reminder_id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, "pending", note, datetime.now(UTC).isoformat(), clinic_id),
+            (reminder_id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, "pending", note, assignee_username, datetime.now(UTC).isoformat(), clinic_id),
         )
         db.commit()
     log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "reminder_created", patient_name)
@@ -3500,6 +3660,7 @@ async def update_reminder(
     reminder_id: str,
     status: str = Form(...),
     note: str = Form(default=""),
+    assignee_username: str = Form(default=""),
 ) -> JSONResponse:
     require_authenticated_api(request)
     clinic_id = get_active_clinic_id(request)
@@ -3507,10 +3668,10 @@ async def update_reminder(
         result = db.execute(
             """
             UPDATE reminder_queue
-            SET status = ?, note = ?
+            SET status = ?, note = ?, assignee_username = ?
             WHERE id = ? AND clinic_id = ?
             """,
-            (status, note, reminder_id, clinic_id),
+            (status, note, assignee_username, reminder_id, clinic_id),
         )
         db.commit()
         if result.rowcount == 0:
@@ -3518,6 +3679,42 @@ async def update_reminder(
     log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "reminder_updated", f"{reminder_id}:{status}")
     log_audit("update", "reminder", reminder_id, f"Updated reminder to {status}.", clinic_id=clinic_id)
     return JSONResponse({"message": "Reminder updated"})
+
+
+@app.post("/api/reminders/bulk-update")
+async def bulk_update_reminders(
+    request: Request,
+    reminder_ids: str = Form(...),
+    status: str = Form(default=""),
+    assignee_username: str = Form(default=""),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    ids = [item.strip() for item in reminder_ids.split(",") if item.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="Select at least one reminder.")
+
+    fields: list[str] = []
+    params: list[object] = []
+    if status:
+        fields.append("status = ?")
+        params.append(status)
+    if assignee_username:
+        fields.append("assignee_username = ?")
+        params.append(assignee_username)
+    if not fields:
+        raise HTTPException(status_code=400, detail="Choose at least one bulk update action.")
+
+    placeholders = ",".join("?" for _ in ids)
+    with get_db() as db:
+        db.execute(
+            f"UPDATE reminder_queue SET {', '.join(fields)} WHERE clinic_id = ? AND id IN ({placeholders})",
+            [*params, clinic_id, *ids],
+        )
+        db.commit()
+    create_notification(clinic_id, "Bulk reminder update", f"Updated {len(ids)} reminder(s).", "/reminders")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "bulk_reminder_update", ",".join(ids[:5]))
+    return JSONResponse({"message": f"Updated {len(ids)} reminder(s)."})
 
 
 @app.post("/api/team/users")
@@ -3529,6 +3726,8 @@ async def create_team_user(
     display_name: str = Form(...),
 ) -> JSONResponse:
     require_admin(request)
+    if role not in TEAM_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid team role.")
     clinic_id = get_active_clinic_id(request)
     with get_db() as db:
         db.execute(
@@ -3550,6 +3749,8 @@ async def update_team_user(
     password: str = Form(default=""),
 ) -> JSONResponse:
     require_admin(request)
+    if role not in TEAM_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid team role.")
     clinic_id = get_active_clinic_id(request)
     with get_db() as db:
         if password:

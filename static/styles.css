@@ -415,6 +415,30 @@ button:hover,
   margin-top: 14px;
 }
 
+.setup-wizard-shell {
+  margin-top: 22px;
+}
+
+.wizard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.wizard-controls {
+  display: flex;
+  gap: 12px;
+}
+
+.wizard-step[hidden] {
+  display: none !important;
+}
+
+.wizard-step-active {
+  box-shadow: 0 20px 46px rgba(20, 108, 120, 0.12);
+}
+
 .saved-filter-actions,
 .saved-filter-list {
   display: flex;
@@ -794,6 +818,10 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.inline-checkbox {
+  margin-bottom: 8px;
 }
 
 .checkbox-row input {

@@ -32,23 +32,41 @@
       </div>
     </section>
 
+    <section class="panel filter-panel">
+      <div class="panel-header"><h2>Bulk Task Actions</h2><p>Move multiple follow-up tasks together as the team works a queue</p></div>
+      <div class="panel-body">
+        <form id="task-bulk-form" class="filter-grid">
+          <input type="hidden" name="task_ids" value="">
+          <label><span>Status</span><select name="status"><option value="">Keep current</option>{% for task_status in task_statuses %}<option value="{{ task_status }}">{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+          <label><span>Priority</span><select name="priority"><option value="">Keep current</option>{% for task_priority in task_priorities %}<option value="{{ task_priority }}">{{ task_priority.title() }}</option>{% endfor %}</select></label>
+          <label><span>Assign to</span><select name="assignee_username"><option value="">Keep current</option>{% for user in assignable_users %}<option value="{{ user.username }}">{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
+          <button type="submit" class="primary-button">Apply Bulk Update</button>
+        </form>
+      </div>
+    </section>
+
     <section class="content-grid">
       {% for task in receptionist_tasks %}
         <article class="panel">
           <div class="panel-body">
             <form class="task-edit-form task-card" data-task-id="{{ task.id }}">
               <div class="task-card-top">
-                <strong>{{ task.patient_name }}</strong>
-              <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
+                <div>
+                  <label class="checkbox-row inline-checkbox"><input type="checkbox" class="bulk-select-checkbox task-select-checkbox" value="{{ task.id }}"> <span>Select</span></label>
+                  <strong>{{ task.patient_name }}</strong>
+                </div>
+                <span class="pill">{{ task.priority.title() }} · {{ task.status.replace("_", " ").title() }}</span>
               </div>
               <span class="muted-line">{{ task.phone_number }}</span>
               <span class="muted-line">SLA: {{ task.sla_status.replace("_", " ").title() }}</span>
+              {% if task.assignee_username %}<span class="muted-line">Owner: {{ task.assignee_username }}</span>{% endif %}
               <label><span>Follow-up note</span><textarea name="note" rows="4">{{ task.note }}</textarea></label>
               <div class="split-grid">
                 <label><span>Due date</span><input type="date" name="due_date" value="{{ task.due_date }}"></label>
                 <label><span>Status</span><select name="status">{% for task_status in task_statuses %}<option value="{{ task_status }}" {% if task.status == task_status %}selected{% endif %}>{{ task_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
               </div>
               <label><span>Priority</span><select name="priority">{% for task_priority in task_priorities %}<option value="{{ task_priority }}" {% if task.priority == task_priority %}selected{% endif %}>{{ task_priority.title() }}</option>{% endfor %}</select></label>
+              <label><span>Assigned owner</span><select name="assignee_username"><option value="">Unassigned</option>{% for user in assignable_users %}<option value="{{ user.username }}" {% if task.assignee_username == user.username %}selected{% endif %}>{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
               <label><span>Tags</span><input name="tags" value="{{ task.tags }}" placeholder="callback, trial, urgent"></label>
               <button type="submit" class="primary-button">Save Task</button>
             </form>

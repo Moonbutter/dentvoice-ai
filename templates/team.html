@@ -17,17 +17,18 @@
     </section>
     <section class="content-grid">
       <article class="panel">
-        <div class="panel-header"><h2>Add Team User</h2><p>Create admin or receptionist access</p></div>
+        <div class="panel-header"><h2>Add Team User</h2><p>Create admin, manager, or receptionist access</p></div>
         <div class="panel-body">
           <form id="team-user-form" class="stack-form">
             <label><span>Username</span><input name="username" required></label>
             <label><span>Display name</span><input name="display_name" required></label>
             <div class="split-grid">
-              <label><span>Role</span><select name="role"><option value="admin">Admin</option><option value="receptionist">Receptionist</option></select></label>
+              <label><span>Role</span><select name="role">{% for role in team_roles %}<option value="{{ role }}">{{ role.replace("_", " ").title() }}</option>{% endfor %}</select></label>
               <label><span>Password</span><input name="password" required></label>
             </div>
             <button type="submit" class="primary-button">Create User</button>
           </form>
+          <div class="top-gap-inline muted-line">Managers can work leads, reminders, and task operations without getting full admin settings access.</div>
         </div>
       </article>
       <article class="panel">
@@ -49,7 +50,7 @@
               <strong>{{ user.username }}</strong>
               <span class="muted-line">{{ user.display_name }} · {% if user.is_active %}Active{% else %}Inactive{% endif %}</span>
               <label><span>Display name</span><input name="display_name" value="{{ user.display_name }}" required></label>
-              <label><span>Role</span><select name="role"><option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option><option value="receptionist" {% if user.role == "receptionist" %}selected{% endif %}>Receptionist</option></select></label>
+              <label><span>Role</span><select name="role">{% for role in team_roles %}<option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role.replace("_", " ").title() }}</option>{% endfor %}</select></label>
               <label><span>Reset password</span><input name="password" placeholder="Leave empty to keep current"></label>
               <div class="row-actions">
                 <button type="submit" class="primary-button">Save User</button>

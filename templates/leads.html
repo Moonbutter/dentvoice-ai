@@ -32,6 +32,23 @@
       </div>
     </section>
 
+    <section class="panel filter-panel">
+      <div class="panel-header"><h2>Bulk Lead Actions</h2><p>Update owner, status, or lost reason across multiple leads at once</p></div>
+      <div class="panel-body">
+        <form id="lead-bulk-form" class="filter-grid">
+          <input type="hidden" name="request_ids" value="">
+          <label><span>Status</span><select name="status"><option value="">Keep current</option>{% for item in contact_statuses %}<option value="{{ item }}">{{ item.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+          <label><span>Assign to</span><select name="assignee_username"><option value="">Keep current</option>{% for user in assignable_users %}<option value="{{ user.username }}">{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
+          <label><span>Replace tags</span><input name="tags" placeholder="mumbai, premium, call-back"></label>
+          <label><span>Lost reason</span><input name="lost_reason" placeholder="No answer, budget mismatch, delayed follow-up"></label>
+          <div class="form-actions-row">
+            <button type="submit" class="primary-button">Apply Bulk Update</button>
+            <button type="button" class="secondary-button" id="lead-auto-assign">Auto-Assign Selected</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
     <section class="pipeline-grid">
       {% for status_name in contact_statuses %}
         <article class="panel pipeline-column">
@@ -62,18 +79,22 @@
             <form class="contact-request-form stack-form card-form" data-request-id="{{ item.id }}">
               <div class="task-card-top">
                 <div>
+                  <label class="checkbox-row inline-checkbox"><input type="checkbox" class="bulk-select-checkbox lead-select-checkbox" value="{{ item.id }}"> <span>Select</span></label>
                   <strong>{{ item.name }}</strong>
                   <span>{{ item.clinic_name }}</span>
                   {% if item.business_type %}
                     <span class="muted-line">{{ item.business_type.replace("_", " ").title() }}</span>
                   {% endif %}
                   <span class="muted-line">{{ item.phone_number }}</span>
+                  {% if item.assignee_username %}<span class="muted-line">Owner: {{ item.assignee_username }}</span>{% endif %}
                 </div>
                 <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
               </div>
               <p class="message-paragraph">{{ item.message }}</p>
               <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
+              <label><span>Assigned owner</span><select name="assignee_username"><option value="">Unassigned</option>{% for user in assignable_users %}<option value="{{ user.username }}" {% if item.assignee_username == user.username %}selected{% endif %}>{{ user.display_name }} · {{ user.role.title() }}</option>{% endfor %}</select></label>
               <label><span>Tags</span><input name="tags" value="{{ item.tags }}" placeholder="dental, mumbai, premium, callback"></label>
+              <label><span>Lost reason</span><input name="lost_reason" value="{{ item.lost_reason }}" placeholder="Budget mismatch, no answer, booked elsewhere"></label>
               <label><span>Owner notes</span><textarea name="owner_notes" rows="4" placeholder="Called clinic manager, waiting for trial slot, send brochure tomorrow">{{ item.owner_notes }}</textarea></label>
               <button type="submit" class="primary-button">Update Lead</button>
             </form>
