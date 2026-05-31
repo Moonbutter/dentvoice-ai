@@ -1,7 +1,7 @@
 {
   "name": "DentVoice AI",
   "short_name": "DentVoice",
-  "description": "AI receptionist platform for dental clinics",
+  "description": "AI receptionist platform for clinics and service businesses",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff7f1",

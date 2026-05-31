@@ -26,12 +26,13 @@
         <div class="hero-actions">
           {% if is_authenticated %}
             <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+            <a class="secondary-button link-button" href="/setup">Workspace Setup</a>
           {% else %}
-            <a class="primary-button link-button" href="/login">Clinic Login</a>
+            <a class="primary-button link-button" href="#trial-signup">Start Free Workspace</a>
+            <a class="secondary-button link-button" href="/login">Clinic Login</a>
           {% endif %}
           <a class="secondary-button link-button" href="#pricing">View Pricing</a>
           <a class="secondary-button link-button" href="#industries">Use Cases</a>
-          <a class="secondary-button link-button" href="https://github.com/Moonbutter/dentvoice-ai">View GitHub</a>
         </div>
         <div class="hero-meta">
           <span>{{ stats.appointments }} saved appointments</span>
@@ -233,6 +234,56 @@
               </ul>
             </article>
           </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Revenue Recovery Calculator</h2>
+          <p>Show a clinic how quickly `₹4,999/month` can pay for itself</p>
+        </div>
+        <div class="panel-body">
+          <form id="roi-form" class="stack-form">
+            <label><span>Missed calls per month</span><input type="number" name="missed_calls" min="0" value="30" required></label>
+            <label><span>Recovery rate (%)</span><input type="number" name="recovery_rate" min="0" max="100" value="20" required></label>
+            <label><span>Average booking value (₹)</span><input type="number" name="booking_value" min="0" value="5000" required></label>
+            <button type="submit" class="secondary-button">Calculate ROI</button>
+          </form>
+          <div id="roi-result" class="card-form top-gap">
+            <strong>Estimated recovered revenue: ₹30,000</strong>
+            <p class="message-paragraph">With 30 missed calls, a 20% recovery rate, and a ₹5,000 average booking, DentVoice can help recover about 6 bookings.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel" id="trial-signup">
+        <div class="panel-header">
+          <h2>Start A Free Workspace</h2>
+          <p>Create a self-serve demo environment for a clinic or local business in under a minute</p>
+        </div>
+        <div class="panel-body">
+          <form id="trial-signup-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Your name</span><input name="owner_name" required></label>
+              <label><span>Clinic or business name</span><input name="clinic_name" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Phone number</span><input name="phone_number" required></label>
+              <label><span>City</span><input name="city" placeholder="Mumbai" required></label>
+            </div>
+            <label>
+              <span>Business type</span>
+              <select name="business_type">
+                <option value="dental">Dental clinic</option>
+                <option value="dermatology">Dermatology / cosmetic clinic</option>
+                <option value="physiotherapy">Physiotherapy clinic</option>
+                <option value="real_estate">Real estate</option>
+                <option value="salon">Salon / spa</option>
+              </select>
+            </label>
+            <button type="submit" class="primary-button">Create Free Workspace</button>
+          </form>
+          <p class="message-paragraph top-gap-inline">This creates a branded workspace, starter slots, FAQ templates, and admin access automatically. Perfect for demos, pilots, and local outreach.</p>
         </div>
       </article>
 

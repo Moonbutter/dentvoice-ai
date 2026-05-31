@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup Workspace - DentVoice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="{{ branding.accent_color }}">
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+</head>
+<body style="--accent: {{ branding.accent_color }};">
+  <main class="page-shell">
+    <section class="hero">
+      <div>
+        <div class="brand-lockup">
+          <div class="logo-badge">{{ branding.logo_text }}</div>
+          <div>
+            <p class="eyebrow">Clinic Setup</p>
+            <h1>Launch {{ settings.clinic_name }} in a few steps.</h1>
+          </div>
+        </div>
+        <p class="hero-copy">This setup page helps a new clinic become demo-ready fast. Finish branding, slots, FAQs, and reminders, then use the live landing page and dashboard to sell the workflow.</p>
+        <div class="hero-meta">
+          <span>{{ setup_progress.completed }} of {{ setup_progress.total }} setup tasks done</span>
+          <span>{{ setup_progress.percent }}% workspace ready</span>
+          <span>{{ session_display_name }}</span>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <a class="secondary-button link-button" href="/dashboard">Back to Dashboard</a>
+        <a class="secondary-button link-button" href="/clinic/{{ settings.slug }}">Open Public Page</a>
+        <button id="seed-demo" class="primary-button">Load Demo Data</button>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card alert">
+        <span class="stat-label">Setup Progress</span>
+        <strong class="stat-value">{{ setup_progress.percent }}%</strong>
+        <span>Use this checklist to make the workspace feel client-ready before outreach.</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Current Slots</span>
+        <strong class="stat-value">{{ slots|length }}</strong>
+        <span>Enough booking options help the live call flow convert faster.</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">FAQ Entries</span>
+        <strong class="stat-value">{{ faqs|length }}</strong>
+        <span>Custom FAQ answers make the receptionist sound vertical-specific.</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Pending Reminders</span>
+        <strong class="stat-value">{{ stats.pending_reminders }}</strong>
+        <span>Reminder workflows prove the product goes beyond call answering.</span>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header">
+          <h2>Workspace Checklist</h2>
+          <p>Follow this order to make the workspace look production-ready</p>
+        </div>
+        <div class="panel-body">
+          <div class="stack-list">
+            {% for item in setup_progress.steps %}
+              <div class="task-card">
+                <div class="task-card-top">
+                  <div>
+                    <strong>{{ loop.index }}. {{ item.label }}</strong>
+                    <span>{{ item.hint }}</span>
+                  </div>
+                  <span class="pill{% if not item.done %} urgent{% endif %}">{% if item.done %}Done{% else %}Pending{% endif %}</span>
+                </div>
+                <div class="row-actions">
+                  <a class="link-inline" href="{{ item.href }}">Open step</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Branding and Availability</h2>
+          <p>Set the public-facing clinic identity and working schedule</p>
+        </div>
+        <div class="panel-body">
+          <form id="settings-form" class="stack-form">
+            <label><span>Clinic name</span><input name="clinic_name" value="{{ settings.clinic_name }}" required></label>
+            <label><span>Clinic timings</span><input name="clinic_timings" value="{{ settings.clinic_timings }}" required></label>
+            <label><span>Clinic address</span><input name="clinic_address" value="{{ settings.clinic_address }}" required></label>
+            <label><span>Brand tagline</span><input name="brand_tagline" value="{{ branding.brand_tagline }}" required></label>
+            <div class="split-grid">
+              <label><span>Accent color</span><input type="color" name="accent_color" value="{{ branding.accent_color }}" required></label>
+              <label><span>Logo text</span><input name="logo_text" value="{{ branding.logo_text }}" maxlength="4" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" placeholder="Mon,Tue,Wed,Thu,Fri,Sat" required></label>
+              <label><span>Working hours</span><input name="working_hours" value="{{ settings.working_hours }}" placeholder="09:00-20:00" required></label>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" name="auto_callback_enabled" value="1" {% if settings.auto_callback_enabled %}checked{% endif %}> <span>Auto-create callback tasks for missed high-intent leads</span></label>
+            <button type="submit" class="primary-button">Save Settings</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Add Booking Slots</h2>
+          <p>Make sure the receptionist always has a few live options to offer</p>
+        </div>
+        <div class="panel-body">
+          <form id="slot-form" class="stack-form">
+            <div class="split-grid">
+              <label><span>Date</span><input type="date" name="date" required></label>
+              <label><span>Time</span><input type="text" name="time" placeholder="10:30 AM" required></label>
+            </div>
+            <button type="submit" class="primary-button">Add Slot</button>
+          </form>
+          <ul class="faq-list">
+            {% for item in slots[:6] %}
+              <li>
+                <strong>Option {{ item.option }}</strong>
+                <span>{{ item.date }} at {{ item.time }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel panel-span-two" id="faq-manager">
+        <div class="panel-header">
+          <h2>FAQ Starter Pack</h2>
+          <p>Teach the receptionist how this clinic answers common questions</p>
+        </div>
+        <div class="panel-body">
+          <form class="faq-create-form stack-form card-form">
+            <label><span>Question</span><input name="question" placeholder="Do you handle aligners?" required></label>
+            <label><span>Answer</span><textarea name="answer" rows="3" placeholder="Yes, the clinic offers aligner consultations and smile-design planning." required></textarea></label>
+            <button type="submit" class="secondary-button">Add FAQ</button>
+          </form>
+          <div class="stack-list">
+            {% for item in faqs[:4] %}
+              <div class="card-form">
+                <strong>{{ item.question }}</strong>
+                <p class="message-paragraph">{{ item.answer }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Go-Live Links</h2>
+          <p>Use these while pitching or testing the product</p>
+        </div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Public clinic page</strong><span><a href="/clinic/{{ settings.slug }}">/clinic/{{ settings.slug }}</a></span></li>
+            <li><strong>Admin dashboard</strong><span><a href="/dashboard">/dashboard</a></span></li>
+            <li><strong>Analytics</strong><span><a href="/analytics">/analytics</a></span></li>
+            <li><strong>Exports</strong><span><a href="/exports">/exports</a></span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Growth Notes</h2>
+          <p>Use the free stack to make the product easy to demo and easy to sell</p>
+        </div>
+        <div class="panel-body">
+          <ul class="feature-list">
+            <li>Load demo data before sales calls so analytics and reminders look active.</li>
+            <li>Use clinic-specific branding to make each landing page look personalized.</li>
+            <li>Capture every inbound inquiry through the public page and the demo CRM.</li>
+            <li>Once free activation looks strong, layer in paid calling and messaging later.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
+</body>
+</html>

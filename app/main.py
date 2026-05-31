@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
@@ -104,7 +105,7 @@ class ClinicSettingsInput(BaseModel):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "dentvoice.db"
-ASSET_VERSION = "20260530-5"
+ASSET_VERSION = "20260531-1"
 
 FAQS = [
     FAQAnswer(question="What are your clinic timings?", answer="We are open Monday to Saturday from 9 AM to 8 PM."),
@@ -470,6 +471,50 @@ def fetch_clinic_by_slug(slug: str) -> dict[str, str] | None:
             (slug,),
         ).fetchone()
         return dict(row) if row else None
+
+
+def create_clinic_workspace(
+    *,
+    slug: str,
+    clinic_name: str,
+    clinic_timings: str,
+    clinic_address: str,
+    brand_tagline: str,
+    accent_color: str,
+    logo_text: str,
+    working_days: str,
+    working_hours: str,
+) -> dict[str, object]:
+    with get_db() as db:
+        cursor = db.execute(
+            """
+            INSERT INTO clinics (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours),
+        )
+        clinic_id = int(cursor.lastrowid)
+        admin_username = f"{slug}-admin"
+        receptionist_username = f"{slug}-desk"
+        db.execute(
+            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name) VALUES (?, ?, ?, ?, ?)",
+            (clinic_id, admin_username, "dentvoice123", "admin", f"{clinic_name} Admin"),
+        )
+        db.execute(
+            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name) VALUES (?, ?, ?, ?, ?)",
+            (clinic_id, receptionist_username, "dentvoice123", "receptionist", f"{clinic_name} Reception"),
+        )
+        for slot in default_slots({"working_hours": working_hours}):
+            db.execute("INSERT INTO slots (slot_date, slot_time, clinic_id) VALUES (?, ?, ?)", (slot["date"], slot["time"], clinic_id))
+        created_at = datetime.now(UTC).isoformat()
+        for index, item in enumerate(FAQS):
+            db.execute(
+                "INSERT INTO faq_entries (question, answer, sort_order, created_at, clinic_id) VALUES (?, ?, ?, ?, ?)",
+                (item.question, item.answer, index, created_at, clinic_id),
+            )
+        db.commit()
+    log_audit("create", "clinic", str(clinic_id), f"Created clinic workspace {clinic_name}.", clinic_id=clinic_id)
+    return {"clinic_id": clinic_id, "admin_username": admin_username, "receptionist_username": receptionist_username}
 
 
 def fetch_slots(clinic_id: int = 1) -> list[dict[str, str]]:
@@ -1215,6 +1260,21 @@ def valid_hex_color(value: str) -> bool:
     return all(character in "0123456789abcdefABCDEF" for character in value[1:])
 
 
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "clinic"
+
+
+def ensure_unique_slug(base_slug: str) -> str:
+    slug = slugify(base_slug)
+    suffix = 1
+    with get_db() as db:
+        while db.execute("SELECT 1 FROM clinics WHERE slug = ?", (slug,)).fetchone():
+            suffix += 1
+            slug = f"{slugify(base_slug)}-{suffix}"
+    return slug
+
+
 def normalize_branding(settings: dict[str, str]) -> dict[str, str]:
     accent = settings.get("accent_color", "#146c78")
     if not valid_hex_color(accent):
@@ -1224,6 +1284,18 @@ def normalize_branding(settings: dict[str, str]) -> dict[str, str]:
         "brand_tagline": settings.get("brand_tagline") or "AI receptionist for dental clinics",
         "accent_color": accent,
     }
+
+
+def build_default_tagline(clinic_name: str, business_type: str) -> str:
+    if business_type == "real_estate":
+        return f"AI front desk for {clinic_name} lead capture"
+    if business_type == "salon":
+        return f"AI booking desk for {clinic_name}"
+    if business_type == "dermatology":
+        return f"AI front desk for {clinic_name} consultations"
+    if business_type == "physiotherapy":
+        return f"AI appointment desk for {clinic_name}"
+    return f"AI front desk for {clinic_name}"
 
 
 def check_double_booking(preferred_date: str, preferred_time: str, *, exclude_appointment_id: str | None = None, clinic_id: int = 1) -> None:
@@ -1476,6 +1548,63 @@ def build_notifications(clinic_id: int = 1) -> list[dict[str, str]]:
     return notifications[:6]
 
 
+def build_setup_progress(clinic_id: int = 1) -> dict[str, object]:
+    settings = fetch_clinic_settings(clinic_id)
+    slots = fetch_slots(clinic_id)
+    faqs = fetch_faq_entries(limit=50, clinic_id=clinic_id)
+    appointments = fetch_appointments(limit=50, clinic_id=clinic_id)
+    reminders = fetch_reminders(limit=50, clinic_id=clinic_id)
+    contacts = [item for item in fetch_contact_requests(limit=200) if item["clinic_name"].lower() == settings["clinic_name"].lower()]
+
+    steps = [
+        {
+            "label": "Brand the clinic page",
+            "done": bool(settings.get("brand_tagline") and settings.get("logo_text") and settings.get("accent_color")),
+            "hint": "Set the clinic name, tagline, logo text, and accent color so the landing page looks client-ready.",
+            "href": "#settings-form",
+        },
+        {
+            "label": "Define working hours",
+            "done": bool(settings.get("working_days") and settings.get("working_hours")),
+            "hint": "Working days and hours control slot generation and make the demo feel more real.",
+            "href": "#settings-form",
+        },
+        {
+            "label": "Review booking slots",
+            "done": len(slots) >= 3,
+            "hint": "Keep at least 3 live booking slots so the call workflow can always book a patient.",
+            "href": "#slot-form",
+        },
+        {
+            "label": "Customize FAQs",
+            "done": len(faqs) >= 4,
+            "hint": "Edit the receptionist answers so the workflow sounds specific to the clinic or business type.",
+            "href": "/dashboard#faq-manager",
+        },
+        {
+            "label": "Capture first appointments",
+            "done": len(appointments) >= 1,
+            "hint": "Seed demo data or create the first booking so analytics and reminders become visible.",
+            "href": "/dashboard",
+        },
+        {
+            "label": "Queue reminders",
+            "done": len(reminders) >= 1,
+            "hint": "Set up reminder workflows so the clinic can see confirmations and follow-up operations.",
+            "href": "/reminders",
+        },
+        {
+            "label": "Collect demand",
+            "done": len(contacts) >= 1,
+            "hint": "Use the public landing page to capture demo requests and prove the lead funnel works.",
+            "href": "/leads",
+        },
+    ]
+    completed = sum(1 for item in steps if item["done"])
+    percent = round((completed / len(steps)) * 100) if steps else 0
+    return {"steps": steps, "completed": completed, "total": len(steps), "percent": percent}
+
+
 def build_dashboard_context(request: Request | None = None, clinic_id: int | None = None) -> dict[str, object]:
     active_clinic_id = clinic_id or get_active_clinic_id(request)
     analytics = fetch_analytics(active_clinic_id)
@@ -1502,6 +1631,7 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "current_clinic_id": active_clinic_id,
         "branding": branding,
         "notifications": build_notifications(active_clinic_id),
+        "setup_progress": build_setup_progress(active_clinic_id),
         "analytics": analytics,
         "chartjs_data": json.dumps(build_chartjs_datasets(analytics)),
         "analytics_charts": {
@@ -1521,6 +1651,7 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "task_priorities": TASK_PRIORITIES,
         "contact_statuses": CONTACT_STATUSES,
         "current_role": get_current_role(request),
+        "session_display_name": request.session.get("dentvoice_display_name") if request else "",
         "asset_version": ASSET_VERSION,
     }
 
@@ -1564,6 +1695,18 @@ async def login_page(request: Request, next: str = Query(default="/dashboard"), 
     context = build_dashboard_context(request)
     context.update({"next_url": next, "login_error": error})
     return templates.TemplateResponse(request, "login.html", context)
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page(request: Request) -> HTMLResponse:
+    redirect_response = require_authenticated_page(request)
+    if redirect_response:
+        return redirect_response
+    if get_current_role(request) != "admin":
+        return RedirectResponse(url="/dashboard", status_code=303)
+    context = build_dashboard_context(request)
+    context.update({"page_title": "Setup Workspace", "is_authenticated": True})
+    return templates.TemplateResponse(request, "setup.html", context)
 
 
 @app.post("/login")
@@ -1884,34 +2027,81 @@ async def create_clinic(
     require_admin(request)
     if not valid_hex_color(accent_color):
         raise HTTPException(status_code=400, detail="Accent color must be a valid hex value like #146c78.")
-    with get_db() as db:
-        cursor = db.execute(
-            """
-            INSERT INTO clinics (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-            """,
-            (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours),
-        )
-        clinic_id = int(cursor.lastrowid)
-        db.execute(
-            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name) VALUES (?, ?, ?, ?, ?)",
-            (clinic_id, f"{slug}-admin", "dentvoice123", "admin", f"{clinic_name} Admin"),
-        )
-        db.execute(
-            "INSERT INTO clinic_users (clinic_id, username, password, role, display_name) VALUES (?, ?, ?, ?, ?)",
-            (clinic_id, f"{slug}-desk", "dentvoice123", "receptionist", f"{clinic_name} Reception"),
-        )
-        for slot in default_slots({"working_hours": working_hours}):
-            db.execute("INSERT INTO slots (slot_date, slot_time, clinic_id) VALUES (?, ?, ?)", (slot["date"], slot["time"], clinic_id))
-        created_at = datetime.now(UTC).isoformat()
-        for index, item in enumerate(FAQS):
-            db.execute(
-                "INSERT INTO faq_entries (question, answer, sort_order, created_at, clinic_id) VALUES (?, ?, ?, ?, ?)",
-                (item.question, item.answer, index, created_at, clinic_id),
-            )
-        db.commit()
-    log_audit("create", "clinic", str(clinic_id), f"Created clinic workspace {clinic_name}.", clinic_id=clinic_id)
+    create_clinic_workspace(
+        slug=slug,
+        clinic_name=clinic_name,
+        clinic_timings=clinic_timings,
+        clinic_address=clinic_address,
+        brand_tagline=brand_tagline,
+        accent_color=accent_color,
+        logo_text=logo_text,
+        working_days=working_days,
+        working_hours=working_hours,
+    )
     return JSONResponse({"message": "Clinic created"})
+
+
+@app.post("/api/trial-signup")
+async def create_trial_signup(
+    request: Request,
+    owner_name: str = Form(...),
+    clinic_name: str = Form(...),
+    phone_number: str = Form(...),
+    business_type: str = Form(...),
+    city: str = Form(...),
+) -> JSONResponse:
+    slug = ensure_unique_slug(clinic_name)
+    accent_map = {
+        "dental": "#146c78",
+        "dermatology": "#9b5de5",
+        "physiotherapy": "#2a9d8f",
+        "real_estate": "#c75c2a",
+        "salon": "#d97706",
+    }
+    clinic_address = f"{city} · Self-serve demo workspace"
+    workspace = create_clinic_workspace(
+        slug=slug,
+        clinic_name=clinic_name,
+        clinic_timings="Monday to Saturday, 9 AM to 8 PM",
+        clinic_address=clinic_address,
+        brand_tagline=build_default_tagline(clinic_name, business_type),
+        accent_color=accent_map.get(business_type, "#146c78"),
+        logo_text="DV",
+        working_days="Mon,Tue,Wed,Thu,Fri,Sat",
+        working_hours="09:00-20:00",
+    )
+    request_id = str(uuid4())
+    created_at = datetime.now(UTC).isoformat()
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, status, owner_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                request_id,
+                owner_name,
+                clinic_name,
+                phone_number,
+                f"Self-serve workspace signup\nBusiness type: {business_type}\nCity: {city}\nAuto-generated admin: {workspace['admin_username']}",
+                created_at,
+                "qualified",
+                "Auto-created from public self-serve signup.",
+            ),
+        )
+        db.commit()
+    request.session["dentvoice_authenticated"] = True
+    request.session["dentvoice_clinic_id"] = int(workspace["clinic_id"])
+    request.session["dentvoice_role"] = "admin"
+    request.session["dentvoice_display_name"] = f"{clinic_name} Admin"
+    return JSONResponse(
+        {
+            "message": "Workspace created",
+            "redirect_url": "/setup",
+            "admin_username": workspace["admin_username"],
+            "password": "dentvoice123",
+        }
+    )
 
 
 @app.get("/api/available-slots")

@@ -242,6 +242,42 @@ document.getElementById("contact-form")?.addEventListener("submit", async (event
   }
 });
 
+document.getElementById("trial-signup-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const result = await postForm("/api/trial-signup", formData);
+    window.sessionStorage.setItem(
+      "dentvoice_toast",
+      `Workspace created. Admin login: ${result.admin_username} / ${result.password}`,
+    );
+    window.location.href = result.redirect_url || "/setup";
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.getElementById("roi-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const missedCalls = Number(form.missed_calls.value || 0);
+  const recoveryRate = Number(form.recovery_rate.value || 0) / 100;
+  const bookingValue = Number(form.booking_value.value || 0);
+  const recoveredBookings = Math.round(missedCalls * recoveryRate);
+  const recoveredRevenue = recoveredBookings * bookingValue;
+  const profitAfterSoftware = recoveredRevenue - 4999;
+  const target = document.getElementById("roi-result");
+  if (!target) {
+    return;
+  }
+  target.innerHTML = `
+    <strong>Estimated recovered revenue: ₹${recoveredRevenue.toLocaleString("en-IN")}</strong>
+    <p class="message-paragraph">If you recover about ${recoveredBookings} bookings from ${missedCalls} missed calls, DentVoice can create roughly ₹${recoveredRevenue.toLocaleString("en-IN")} in value.</p>
+    <p class="message-paragraph">After a ₹4,999 monthly subscription, that leaves an estimated ₹${profitAfterSoftware.toLocaleString("en-IN")} in recovered upside.</p>
+  `;
+});
+
 document.querySelectorAll(".contact-request-form").forEach((form) => {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

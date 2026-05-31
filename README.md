@@ -1,6 +1,6 @@
 # DentVoice AI MVP
 
-DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinics. This prototype includes:
+DentVoice AI is a lightweight MVP for an AI receptionist and revenue-recovery platform for dental clinics and other service businesses. This prototype includes:
 
 - A FastAPI backend
 - A clinic dashboard UI
@@ -21,6 +21,7 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Calendar view for appointments
 - Patient profile summaries
 - Contact/demo request form
+- Self-serve free workspace signup
 - Audit log for product activity
 - Double-booking protection
 - In-app toast notifications
@@ -30,6 +31,8 @@ DentVoice AI is a lightweight MVP for an AI receptionist built for dental clinic
 - Onboarding walkthrough for new users
 - Clinic branding with custom logo text, tagline, and accent color
 - Visual analytics with chart-style summaries
+- ROI calculator and pricing-led landing page
+- Admin setup workspace checklist
 
 ## Project Structure
 
@@ -64,6 +67,7 @@ uvicorn app.main:app --reload
 - `GET /` - Public landing page
 - `GET /dashboard` - Admin dashboard
 - `GET /login` - Local clinic admin login
+- `GET /setup` - Admin workspace setup checklist
 - `GET /appointments` - Appointment management page
 - `GET /calls` - Call management page
 - `GET /analytics` - Analytics page
@@ -77,6 +81,7 @@ uvicorn app.main:app --reload
 - `GET /api/export/appointments.csv` - Export appointments
 - `GET /api/export/calls.csv` - Export calls
 - `POST /api/contact-request` - Save landing-page demo request
+- `POST /api/trial-signup` - Create a self-serve clinic workspace from the public site
 - `POST /api/simulate-call` - Simulate an inbound patient call
 - `POST /api/appointments` - Create an appointment request
 - `POST /api/admin/appointments` - Create appointment from dashboard
