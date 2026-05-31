@@ -13,42 +13,115 @@
 </head>
 <body style="--accent: {{ branding.accent_color }};">
   <main class="landing-shell">
-    <section class="landing-hero">
-      <div class="landing-copy">
-        <div class="brand-lockup">
-          <div class="logo-badge">{{ branding.logo_text }}</div>
-          <div>
-        <p class="eyebrow">Revenue Recovery AI for Service Businesses</p>
-        <h1>Stop losing customers when nobody answers the phone.</h1>
-          </div>
-        </div>
-        <p class="hero-copy">{{ branding.brand_tagline }}. DentVoice helps clinics and appointment-led businesses recover missed revenue by answering instantly, capturing leads, booking appointments, and keeping follow-up work visible in one operating dashboard.</p>
-        <div class="hero-actions">
-          {% if is_authenticated %}
-            <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
-            <a class="secondary-button link-button" href="/setup">Workspace Setup</a>
-          {% else %}
-            <a class="primary-button link-button" href="#trial-signup">Start Free Workspace</a>
-            <a class="secondary-button link-button" href="/login">Clinic Login</a>
-          {% endif %}
-          <a class="secondary-button link-button" href="#pricing">View Pricing</a>
-          <a class="secondary-button link-button" href="#industries">Use Cases</a>
-        </div>
-        <div class="hero-meta">
-          <span>{{ stats.appointments }} saved appointments</span>
-          <span>{{ stats.calls }} call records</span>
-          <span>{{ stats.emergencies }} emergency flags</span>
-          <span>{{ stats.contacts }} demo requests</span>
+    <section class="site-nav">
+      <div class="site-nav-brand">
+        <div class="logo-badge">{{ branding.logo_text }}</div>
+        <div>
+          <p class="eyebrow">DentVoice AI</p>
+          <strong>Revenue recovery operating system</strong>
         </div>
       </div>
-      <div class="landing-card">
-        <p class="landing-card-label">Why businesses buy this</p>
-        <ul class="feature-list">
-          <li>Missed calls become missed revenue when patients move to the next clinic or business.</li>
-          <li>DentVoice answers instantly, captures the inquiry, and keeps the lead inside your workflow.</li>
-          <li>Even one recovered patient or booking can justify a ₹5,000 monthly subscription.</li>
-          <li>Works for clinics first, but the same model fits salons and real estate teams too.</li>
-        </ul>
+      <div class="site-nav-links">
+        <a class="link-inline" href="#pricing">Pricing</a>
+        <a class="link-inline" href="#industries">Industries</a>
+        <a class="link-inline" href="#trial-signup">Start Free</a>
+        {% if is_authenticated %}
+          <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
+        {% else %}
+          <a class="secondary-button link-button" href="/login">Clinic Login</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="landing-hero hero-premium">
+      <div class="landing-hero-grid">
+        <div class="landing-copy">
+          <div class="hero-pill-row">
+            <span class="hero-signal-pill">Voice-first demand capture</span>
+            <span class="hero-signal-pill">Built for India</span>
+            <span class="hero-signal-pill">Appointment-led businesses</span>
+          </div>
+          <div class="brand-lockup">
+            <div class="logo-badge">{{ branding.logo_text }}</div>
+            <div>
+              <p class="eyebrow">Revenue Recovery AI for Service Businesses</p>
+              <h1>Stop losing customers when nobody answers the phone.</h1>
+            </div>
+          </div>
+          <p class="hero-copy">{{ branding.brand_tagline }}. DentVoice helps clinics and appointment-led businesses recover missed revenue by answering instantly, capturing leads, booking appointments, and keeping follow-up work visible in one operating dashboard.</p>
+          <div class="hero-actions">
+            {% if is_authenticated %}
+              <a class="primary-button link-button" href="/dashboard">Open Live Dashboard</a>
+              <a class="secondary-button link-button" href="/setup">Workspace Setup</a>
+            {% else %}
+              <a class="primary-button link-button" href="#trial-signup">Start Free Workspace</a>
+              <a class="secondary-button link-button" href="/login">Clinic Login</a>
+            {% endif %}
+            <a class="secondary-button link-button" href="#pricing">View Pricing</a>
+            <a class="secondary-button link-button" href="#industries">Use Cases</a>
+          </div>
+          <div class="hero-meta">
+            <span>{{ stats.appointments }} saved appointments</span>
+            <span>{{ stats.calls }} call records</span>
+            <span>{{ stats.emergencies }} emergency flags</span>
+            <span>{{ stats.contacts }} demo requests</span>
+          </div>
+          <div class="hero-proof-band">
+            <div>
+              <strong>Answer instantly</strong>
+              <span>missed calls stop becoming missed revenue</span>
+            </div>
+            <div>
+              <strong>Route follow-up</strong>
+              <span>tasks, reminders, leads, and owners stay visible</span>
+            </div>
+            <div>
+              <strong>Prove ROI</strong>
+              <span>recovered bookings justify the subscription fast</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-showcase">
+          <div class="hero-orb hero-orb-one"></div>
+          <div class="hero-orb hero-orb-two"></div>
+          <article class="showcase-visual-card">
+            <div class="showcase-visual-frame">
+              <img class="showcase-image" src="/static/images/hero-ai-ops.png" alt="3D AI receptionist operations illustration">
+            </div>
+            <div class="showcase-caption">
+              <strong>AI receptionist control layer</strong>
+              <span>Calls, appointments, follow-up, and clinic ops in one visual command surface.</span>
+            </div>
+          </article>
+          <article class="showcase-card showcase-primary">
+            <p class="landing-card-label">Command View</p>
+            <h3>Every missed call becomes a workflow, not a dead end.</h3>
+            <div class="showcase-metric-stack">
+              <div class="showcase-metric">
+                <strong>₹{{ analytics.estimated_revenue_recovered }}</strong>
+                <span>estimated revenue recovered</span>
+              </div>
+              <div class="showcase-metric">
+                <strong>{{ analytics.conversion_rate }}%</strong>
+                <span>call-to-booking conversion</span>
+              </div>
+              <div class="showcase-metric">
+                <strong>{{ stats.open_tasks }}</strong>
+                <span>follow-up items in motion</span>
+              </div>
+            </div>
+          </article>
+          <article class="showcase-card showcase-secondary">
+            <p class="landing-card-label">Why businesses buy this</p>
+            <ul class="feature-list">
+              <li>Missed calls become missed revenue when patients move to the next clinic or business.</li>
+              <li>DentVoice answers instantly, captures the inquiry, and keeps the lead inside your workflow.</li>
+              <li>Even one recovered patient or booking can justify a ₹5,000 monthly subscription.</li>
+              <li>Works for clinics first, but the same model fits salons and real estate teams too.</li>
+            </ul>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -179,25 +252,36 @@
           <p>Start with one niche, then expand the same revenue-recovery model</p>
         </div>
         <div class="panel-body">
-          <div class="pricing-grid">
-            <article class="pricing-card">
-              <p class="landing-card-label">Dental Clinics</p>
-              <h3>Missed calls become lost appointments</h3>
-              <p class="message-paragraph">Patients call during procedures, after hours, or when staff is overloaded. DentVoice answers, captures intent, and reduces front-desk leakage.</p>
-              <a class="link-inline" href="/solutions/dental">Open dental case study</a>
-            </article>
-            <article class="pricing-card">
-              <p class="landing-card-label">Real Estate</p>
-              <h3>Fast leads disappear in minutes</h3>
-              <p class="message-paragraph">If a broker is driving or showing property, the lead often goes elsewhere. DentVoice keeps the lead inside the system for quick follow-up.</p>
-              <a class="link-inline" href="/solutions/real_estate">Open real estate case study</a>
-            </article>
-            <article class="pricing-card">
-              <p class="landing-card-label">Salons</p>
-              <h3>Peak-time bookings are easy to lose</h3>
-              <p class="message-paragraph">If no one answers a Saturday booking request, the customer simply books elsewhere. DentVoice helps capture those high-intent calls.</p>
-              <a class="link-inline" href="/solutions/salon">Open salon case study</a>
-            </article>
+          <div class="industry-showcase">
+            <div class="industry-visual">
+              <div class="industry-visual-frame">
+                <img class="industry-visual-image" src="/static/images/industry-ai-network.png" alt="3D multi-industry AI workflow illustration">
+              </div>
+              <div class="showcase-caption">
+                <strong>One engine, multiple service verticals</strong>
+                <span>Start with dental, then reuse the same demand-capture workflow for real estate, salons, and other appointment-led businesses.</span>
+              </div>
+            </div>
+            <div class="pricing-grid industry-grid">
+              <article class="pricing-card">
+                <p class="landing-card-label">Dental Clinics</p>
+                <h3>Missed calls become lost appointments</h3>
+                <p class="message-paragraph">Patients call during procedures, after hours, or when staff is overloaded. DentVoice answers, captures intent, and reduces front-desk leakage.</p>
+                <a class="link-inline" href="/solutions/dental">Open dental case study</a>
+              </article>
+              <article class="pricing-card">
+                <p class="landing-card-label">Real Estate</p>
+                <h3>Fast leads disappear in minutes</h3>
+                <p class="message-paragraph">If a broker is driving or showing property, the lead often goes elsewhere. DentVoice keeps the lead inside the system for quick follow-up.</p>
+                <a class="link-inline" href="/solutions/real_estate">Open real estate case study</a>
+              </article>
+              <article class="pricing-card">
+                <p class="landing-card-label">Salons</p>
+                <h3>Peak-time bookings are easy to lose</h3>
+                <p class="message-paragraph">If no one answers a Saturday booking request, the customer simply books elsewhere. DentVoice helps capture those high-intent calls.</p>
+                <a class="link-inline" href="/solutions/salon">Open salon case study</a>
+              </article>
+            </div>
           </div>
         </div>
       </article>
