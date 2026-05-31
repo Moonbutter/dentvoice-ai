@@ -1,10 +1,13 @@
-const CACHE_NAME = "dentvoice-cache-v1";
+const CACHE_NAME = "dentvoice-cache-v2";
 const APP_SHELL = [
   "/",
   "/static/styles.css",
   "/static/app.js",
   "/static/manifest.webmanifest",
-  "/static/icon.svg"
+  "/static/icon.svg",
+  "/static/offline.html",
+  "/static/images/hero-ai-ops.png",
+  "/static/images/industry-ai-network.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -23,7 +26,31 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
   }
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          return cached || caches.match("/static/offline.html");
+        })
+    );
+    return;
+  }
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then((cached) => {
+      const networkFetch = fetch(event.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          return response;
+        })
+        .catch(() => cached);
+      return cached || networkFetch;
+    })
   );
 });

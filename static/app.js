@@ -756,6 +756,83 @@ document.getElementById("onboarding-email-form")?.addEventListener("submit", asy
   }
 });
 
+document.getElementById("report-schedule-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const formData = new FormData(event.currentTarget);
+    await postForm("/api/report-schedules", formData);
+    refreshPage("Report schedule created");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+document.querySelectorAll(".import-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/import/${form.dataset.importType}`, formData);
+      refreshPage("CSV import complete");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".cleanup-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm("/api/cleanup", formData);
+      refreshPage("Cleanup completed");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".duplicate-cleanup-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData();
+      formData.set("target_type", form.dataset.targetType);
+      formData.set("key", form.dataset.duplicateKey);
+      await postForm("/api/duplicates/cleanup", formData);
+      refreshPage("Duplicate cleanup complete");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".archive-restore-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postForm(`/api/archive/${form.dataset.archiveId}/restore`, new FormData());
+      refreshPage("Archived record restored");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".case-study-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm(`/api/solutions/${form.dataset.businessType}/content`, formData);
+      refreshPage("Case-study content updated");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
 document.querySelectorAll(".onboarding-step-complete").forEach((button) => {
   button.addEventListener("click", async () => {
     try {

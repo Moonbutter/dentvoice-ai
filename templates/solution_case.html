@@ -14,8 +14,8 @@
     <section class="landing-hero">
       <div class="landing-copy">
         <p class="eyebrow">{{ case_template.label }}</p>
-        <h1>DentVoice for {{ case_template.label.lower() }}.</h1>
-        <p class="hero-copy">{{ case_template.tagline }}. This page is a vertical-specific sales surface you can use for outreach, ads, or investor demos.</p>
+        <h1>{{ case_content.headline if case_content else ('DentVoice for ' ~ case_template.label.lower() ~ '.') }}</h1>
+        <p class="hero-copy">{{ case_content.subheadline if case_content else case_template.tagline }}. This page is a vertical-specific sales surface you can use for outreach, ads, or investor demos.</p>
         <div class="hero-actions">
           <a class="primary-button link-button" href="/#trial-signup">Start Free Workspace</a>
           <a class="secondary-button link-button" href="/#pricing">View Pricing</a>
@@ -24,12 +24,40 @@
       <div class="landing-card">
         <p class="landing-card-label">Why this vertical fits</p>
         <ul class="feature-list">
-          <li>Average booking value benchmark: ₹{{ case_template.avg_booking_value }}</li>
-          <li>Default hours: {{ case_template.timings_label }}</li>
-          <li>Workflow can be templated before paid integrations.</li>
+          {% if case_content %}
+            {% for item in case_content.proof_points %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          {% else %}
+            <li>Average booking value benchmark: ₹{{ case_template.avg_booking_value }}</li>
+            <li>Default hours: {{ case_template.timings_label }}</li>
+            <li>Workflow can be templated before paid integrations.</li>
+          {% endif %}
         </ul>
+        <p class="message-paragraph top-gap-inline">{{ case_content.roi_text if case_content else 'Recover just a few missed inquiries and the monthly subscription can justify itself quickly.' }}</p>
       </div>
     </section>
+
+    {% if is_authenticated and current_role == "admin" %}
+      <section class="landing-grid top-gap">
+        <article class="panel panel-span-two">
+          <div class="panel-header"><h2>Edit This Industry Page</h2><p>Free CMS layer for outreach and sales proof without paid content tools</p></div>
+          <div class="panel-body">
+            <form class="case-study-form stack-form" data-business-type="{{ case_key }}">
+              <label><span>Headline</span><input name="headline" value="{{ case_content.headline if case_content else ('DentVoice for ' ~ case_template.label.lower() ~ '.') }}" required></label>
+              <label><span>Subheadline</span><textarea name="subheadline" rows="3" required>{{ case_content.subheadline if case_content else case_template.tagline }}</textarea></label>
+              <label><span>Proof points (one per line)</span><textarea name="proof_points" rows="5" required>{% if case_content %}{{ case_content.proof_points | join('\n') }}{% else %}Average booking value benchmark: ₹{{ case_template.avg_booking_value }}
+Default hours: {{ case_template.timings_label }}
+Workflow can be templated before paid integrations.{% endif %}</textarea></label>
+              <label><span>ROI text</span><textarea name="roi_text" rows="3" required>{{ case_content.roi_text if case_content else 'Recover just a few missed inquiries and the monthly subscription can justify itself quickly.' }}</textarea></label>
+              <button type="submit" class="primary-button">Save case-study content</button>
+            </form>
+          </div>
+        </article>
+      </section>
+      <div id="toast" class="toast" hidden></div>
+      <script src="/static/app.js?v={{ asset_version }}"></script>
+    {% endif %}
   </main>
 </body>
 </html>

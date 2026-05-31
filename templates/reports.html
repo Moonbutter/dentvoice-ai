@@ -38,6 +38,26 @@
           <a class="secondary-button link-button top-gap-inline" href="/api/export/benchmarks.csv">Download benchmarks CSV</a>
         </div>
       </article>
+      <article class="panel">
+        <div class="panel-header"><h2>Report Schedules</h2><p>Simulate scheduled reporting before paid email automation</p></div>
+        <div class="panel-body">
+          <form id="report-schedule-form" class="stack-form card-form">
+            <label><span>Report type</span><select name="report_type"><option value="business_summary">Business summary</option><option value="benchmark_snapshot">Benchmark snapshot</option><option value="forecast_report">Forecast report</option></select></label>
+            <div class="split-grid">
+              <label><span>Cadence</span><select name="cadence"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+              <label><span>Recipient label</span><input name="recipient_label" placeholder="Clinic Owner" required></label>
+            </div>
+            <button type="submit" class="secondary-button">Create schedule</button>
+          </form>
+          <ul class="faq-list top-gap-inline">
+            {% for item in report_schedules %}
+              <li><div><strong>{{ item.report_type.replace("_", " ").title() }}</strong><span>{{ item.cadence.title() }} · {{ item.recipient_label }}</span></div><div class="record-meta"><span class="pill">{{ item.status.title() }}</span></div></li>
+            {% else %}
+              <p class="empty-state">No report schedules yet.</p>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
       <article class="panel panel-span-two">
         <div class="panel-header"><h2>Onboarding Email Queue</h2><p>Simulate customer success emails without paid email tools</p></div>
         <div class="panel-body">

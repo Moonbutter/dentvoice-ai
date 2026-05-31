@@ -23,7 +23,92 @@
       <article class="panel"><div class="panel-header"><h2>Reminders</h2><p>Reminder queue and status history</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/reminders.csv">Download reminders CSV</a></div></article>
       <article class="panel"><div class="panel-header"><h2>Summary Report</h2><p>Clinic-ready operating summary for founders and managers</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/summary.csv">Download summary CSV</a></div></article>
       <article class="panel"><div class="panel-header"><h2>Benchmark Report</h2><p>Cross-clinic comparison for franchise or agency operators</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/benchmarks.csv">Download benchmarks CSV</a></div></article>
+      <article class="panel"><div class="panel-header"><h2>Business Pack</h2><p>Founder-ready summary pack for revenue, ops, and conversion</p></div><div class="panel-body"><a class="primary-button link-button" href="/api/export/business-pack.csv">Download business pack CSV</a></div></article>
     </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>CSV Import Center</h2><p>Load patients, leads, and appointments without paid tooling</p></div>
+        <div class="panel-body stack-form">
+          <form class="import-form card-form" data-import-type="patients">
+            <label><span>Import patients CSV</span><input type="file" name="file" accept=".csv" required></label>
+            <button type="submit" class="secondary-button">Upload patients</button>
+          </form>
+          <form class="import-form card-form" data-import-type="leads">
+            <label><span>Import leads CSV</span><input type="file" name="file" accept=".csv" required></label>
+            <button type="submit" class="secondary-button">Upload leads</button>
+          </form>
+          <form class="import-form card-form" data-import-type="appointments">
+            <label><span>Import appointments CSV</span><input type="file" name="file" accept=".csv" required></label>
+            <button type="submit" class="secondary-button">Upload appointments</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Cleanup Tools</h2><p>Keep the workspace tidy before paid automation is added</p></div>
+        <div class="panel-body stack-form">
+          <form class="cleanup-form card-form">
+            <input type="hidden" name="action" value="clear_read_notifications">
+            <strong>Clear read notifications</strong>
+            <button type="submit" class="secondary-button">Run cleanup</button>
+          </form>
+          <form class="cleanup-form card-form">
+            <input type="hidden" name="action" value="archive_done_tasks">
+            <strong>Archive completed tasks</strong>
+            <button type="submit" class="secondary-button">Archive tasks</button>
+          </form>
+          <form class="cleanup-form card-form">
+            <input type="hidden" name="action" value="archive_sent_reminders">
+            <strong>Archive sent reminders</strong>
+            <button type="submit" class="secondary-button">Archive reminders</button>
+          </form>
+        </div>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-header"><h2>Duplicate Review</h2><p>Find and clean repeated patient or lead records</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in duplicate_report.patients %}
+              <li>
+                <div><strong>{{ item.title }}</strong><span>{{ item.count }} patient records · {{ item.detail }}</span></div>
+                <form class="duplicate-cleanup-form row-actions" data-target-type="patients" data-duplicate-key="{{ item.key }}"><button type="submit" class="secondary-button">Clean patient duplicates</button></form>
+              </li>
+            {% endfor %}
+            {% for item in duplicate_report.leads %}
+              <li>
+                <div><strong>{{ item.title }}</strong><span>{{ item.count }} lead records · {{ item.detail }}</span></div>
+                <form class="duplicate-cleanup-form row-actions" data-target-type="leads" data-duplicate-key="{{ item.key }}"><button type="submit" class="secondary-button">Clean lead duplicates</button></form>
+              </li>
+            {% endfor %}
+            {% if not duplicate_report.patients and not duplicate_report.leads %}
+              <p class="empty-state">No duplicate patient or lead clusters found right now.</p>
+            {% endif %}
+          </ul>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Archive And Restore</h2><p>Recover deleted operational records without paid backup tooling</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            {% for item in archived_records[:12] %}
+              <li>
+                <div><strong>{{ item.title }}</strong><span>{{ item.entity_type.replace("_", " ").title() }} · {{ item.archived_at[:16].replace("T", " ") }}</span></div>
+                <form class="archive-restore-form row-actions" data-archive-id="{{ item.id }}"><button type="submit" class="secondary-button">Restore</button></form>
+              </li>
+            {% else %}
+              <p class="empty-state">No archived records yet.</p>
+            {% endfor %}
+          </ul>
+        </div>
+      </article>
+    </section>
+    <div id="toast" class="toast" hidden></div>
   </main>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ from typing import Literal
 from urllib.parse import quote_plus
 from uuid import uuid4
 
-from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -110,7 +110,7 @@ class ClinicSettingsInput(BaseModel):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "dentvoice.db"
-ASSET_VERSION = "20260531-3"
+ASSET_VERSION = "20260601-1"
 
 FAQS = [
     FAQAnswer(question="What are your clinic timings?", answer="We are open Monday to Saturday from 9 AM to 8 PM."),
@@ -497,6 +497,35 @@ def init_db() -> None:
                 ip_address TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS archived_records (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                archived_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS report_schedules (
+                id TEXT PRIMARY KEY,
+                clinic_id INTEGER NOT NULL,
+                report_type TEXT NOT NULL,
+                cadence TEXT NOT NULL,
+                recipient_label TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS case_study_content (
+                id TEXT PRIMARY KEY,
+                business_type TEXT NOT NULL UNIQUE,
+                headline TEXT NOT NULL,
+                subheadline TEXT NOT NULL,
+                proof_points_json TEXT NOT NULL,
+                roi_text TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 
@@ -639,6 +668,49 @@ def init_db() -> None:
                 db.execute(
                     "INSERT INTO faq_entries (question, answer, sort_order, created_at, clinic_id) VALUES (?, ?, ?, ?, ?)",
                     (item.question, item.answer, index, created_at, 1),
+                )
+
+        existing_schedules = db.execute("SELECT COUNT(*) AS count FROM report_schedules").fetchone()["count"]
+        if existing_schedules == 0:
+            created_at = datetime.now(UTC).isoformat()
+            db.execute(
+                """
+                INSERT INTO report_schedules (id, clinic_id, report_type, cadence, recipient_label, status, created_at)
+                VALUES (?, 1, 'business_summary', 'weekly', 'Clinic Owner', 'active', ?)
+                """,
+                (str(uuid4()), created_at),
+            )
+            db.execute(
+                """
+                INSERT INTO report_schedules (id, clinic_id, report_type, cadence, recipient_label, status, created_at)
+                VALUES (?, 1, 'benchmark_snapshot', 'monthly', 'HQ / Agency', 'active', ?)
+                """,
+                (str(uuid4()), created_at),
+            )
+
+        existing_case_content = db.execute("SELECT COUNT(*) AS count FROM case_study_content").fetchone()["count"]
+        if existing_case_content == 0:
+            created_at = datetime.now(UTC).isoformat()
+            for key, template in INDUSTRY_TEMPLATES.items():
+                proof_points = [
+                    f"Average booking benchmark: INR {int(template['avg_booking_value']):,}",
+                    f"Default hours: {template['timings_label']}",
+                    "Missed inbound demand becomes a measurable recovery workflow.",
+                ]
+                db.execute(
+                    """
+                    INSERT INTO case_study_content (id, business_type, headline, subheadline, proof_points_json, roi_text, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        key,
+                        f"DentVoice for {template['label'].lower()}",
+                        str(template["tagline"]),
+                        json.dumps(proof_points),
+                        "Recover just a few missed inquiries and the monthly subscription can justify itself quickly.",
+                        created_at,
+                    ),
                 )
 
         db.commit()
@@ -1121,6 +1193,113 @@ def fetch_onboarding_emails(clinic_id: int = 1, limit: int = 50) -> list[dict[st
             (clinic_id, limit),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def fetch_report_schedules(clinic_id: int = 1, limit: int = 100) -> list[dict[str, str]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, report_type, cadence, recipient_label, status, created_at
+            FROM report_schedules
+            WHERE clinic_id = ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (clinic_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_archived_records(clinic_id: int = 1, limit: int = 100) -> list[dict[str, object]]:
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, entity_type, entity_id, payload_json, archived_at
+            FROM archived_records
+            WHERE clinic_id = ?
+            ORDER BY datetime(archived_at) DESC
+            LIMIT ?
+            """,
+            (clinic_id, limit),
+        ).fetchall()
+    results: list[dict[str, object]] = []
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        results.append(
+            {
+                "id": row["id"],
+                "entity_type": row["entity_type"],
+                "entity_id": row["entity_id"],
+                "payload": payload,
+                "archived_at": row["archived_at"],
+                "title": payload.get("patient_name")
+                or payload.get("name")
+                or payload.get("subject")
+                or payload.get("phone_number")
+                or row["entity_id"],
+            }
+        )
+    return results
+
+
+def fetch_case_study_content(business_type: str) -> dict[str, object] | None:
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT headline, subheadline, proof_points_json, roi_text, updated_at
+            FROM case_study_content
+            WHERE business_type = ?
+            """,
+            (business_type,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "headline": row["headline"],
+        "subheadline": row["subheadline"],
+        "proof_points": json.loads(row["proof_points_json"]),
+        "roi_text": row["roi_text"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def build_duplicate_report(clinic_id: int = 1) -> dict[str, list[dict[str, object]]]:
+    appointments = fetch_appointments(limit=5000, clinic_id=clinic_id)
+    leads = fetch_contact_requests(limit=5000)
+
+    duplicate_patients: list[dict[str, object]] = []
+    grouped_appointments: defaultdict[str, list[AppointmentRequest]] = defaultdict(list)
+    for item in appointments:
+        grouped_appointments[item.phone_number].append(item)
+    for phone, items in grouped_appointments.items():
+        if len(items) < 2:
+            continue
+        unique_reasons = sorted({item.reason_for_visit for item in items})
+        duplicate_patients.append(
+            {
+                "key": phone,
+                "count": len(items),
+                "title": items[0].patient_name,
+                "detail": ", ".join(unique_reasons[:3]),
+            }
+        )
+
+    duplicate_leads: list[dict[str, object]] = []
+    grouped_leads: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
+    for item in leads:
+        grouped_leads[item["phone_number"]].append(item)
+    for phone, items in grouped_leads.items():
+        if len(items) < 2:
+            continue
+        duplicate_leads.append(
+            {
+                "key": phone,
+                "count": len(items),
+                "title": items[0]["name"],
+                "detail": ", ".join(sorted({entry["clinic_name"] for entry in items})[:3]),
+            }
+        )
+    return {"patients": duplicate_patients[:20], "leads": duplicate_leads[:20]}
 
 
 def fetch_faq_entries(limit: int = 50, clinic_id: int = 1) -> list[dict[str, object]]:
@@ -1720,6 +1899,19 @@ def log_audit(action: str, entity_type: str, entity_id: str | None, summary: str
             (action, entity_type, entity_id, summary, datetime.now(UTC).isoformat(), clinic_id),
         )
         db.commit()
+
+
+def archive_record(entity_type: str, entity_id: str, payload: dict[str, object], clinic_id: int = 1) -> None:
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO archived_records (id, clinic_id, entity_type, entity_id, payload_json, archived_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid4()), clinic_id, entity_type, entity_id, json.dumps(payload), datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    log_audit("archive", entity_type, entity_id, f"Archived {entity_type} record.", clinic_id=clinic_id)
 
 
 def log_access_event(request: Request | None, clinic_id: int, username: str, role: str, action: str, detail: str = "") -> None:
@@ -2457,6 +2649,7 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
     sla_dashboard = build_sla_dashboard(active_clinic_id)
     announcements = fetch_announcements(active_clinic_id, limit=10)
     automation_rules = fetch_automation_rules(active_clinic_id, limit=50)
+    duplicate_report = build_duplicate_report(active_clinic_id)
     current_role = get_current_role(request)
     return {
         "stats": analytics["totals"],
@@ -2490,6 +2683,9 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "unread_notification_count": len(fetch_notifications(active_clinic_id, unread_only=True, limit=100)),
         "referrals": fetch_referrals(active_clinic_id),
         "onboarding_emails": fetch_onboarding_emails(active_clinic_id),
+        "report_schedules": fetch_report_schedules(active_clinic_id),
+        "archived_records": fetch_archived_records(active_clinic_id, limit=50),
+        "duplicate_report": duplicate_report,
         "benchmark_report": build_benchmark_report(),
         "report_summary": build_report_summary(active_clinic_id),
         "staff_performance": staff_performance,
@@ -2930,14 +3126,85 @@ async def reports_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "reports.html", context)
 
 
+@app.post("/api/report-schedules")
+async def create_report_schedule(
+    request: Request,
+    report_type: str = Form(...),
+    cadence: str = Form(...),
+    recipient_label: str = Form(...),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO report_schedules (id, clinic_id, report_type, cadence, recipient_label, status, created_at)
+            VALUES (?, ?, ?, ?, ?, 'active', ?)
+            """,
+            (str(uuid4()), clinic_id, report_type, cadence, recipient_label, datetime.now(UTC).isoformat()),
+        )
+        db.commit()
+    create_notification(clinic_id, "Report schedule added", f"{report_type.replace('_', ' ').title()} set to {cadence}.", "/reports")
+    return JSONResponse({"message": "Report schedule created"})
+
+
 @app.get("/solutions/{business_type}", response_class=HTMLResponse)
 async def solutions_page(request: Request, business_type: str) -> HTMLResponse:
     template = INDUSTRY_TEMPLATES.get(business_type)
     if template is None:
         raise HTTPException(status_code=404, detail="Solution page not found")
     context = build_dashboard_context(request, clinic_id=1)
-    context.update({"page_title": f"{template['label']} Solution", "case_template": template, "case_key": business_type, "is_authenticated": is_authenticated(request)})
+    context.update(
+        {
+            "page_title": f"{template['label']} Solution",
+            "case_template": template,
+            "case_key": business_type,
+            "case_content": fetch_case_study_content(business_type),
+            "is_authenticated": is_authenticated(request),
+        }
+    )
     return templates.TemplateResponse(request, "solution_case.html", context)
+
+
+@app.post("/api/solutions/{business_type}/content")
+async def update_case_study_content(
+    request: Request,
+    business_type: str,
+    headline: str = Form(...),
+    subheadline: str = Form(...),
+    proof_points: str = Form(...),
+    roi_text: str = Form(...),
+) -> JSONResponse:
+    require_admin(request)
+    if business_type not in INDUSTRY_TEMPLATES:
+        raise HTTPException(status_code=404, detail="Business type not found")
+    clinic_id = get_active_clinic_id(request)
+    normalized_points = [item.strip() for item in proof_points.splitlines() if item.strip()]
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO case_study_content (id, business_type, headline, subheadline, proof_points_json, roi_text, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(business_type) DO UPDATE SET
+                headline = excluded.headline,
+                subheadline = excluded.subheadline,
+                proof_points_json = excluded.proof_points_json,
+                roi_text = excluded.roi_text,
+                updated_at = excluded.updated_at
+            """,
+            (
+                str(uuid4()),
+                business_type,
+                headline,
+                subheadline,
+                json.dumps(normalized_points),
+                roi_text,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        db.commit()
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "case_study_updated", business_type)
+    return JSONResponse({"message": "Case-study content updated"})
 
 
 @app.get("/health")
@@ -4252,6 +4519,372 @@ async def export_benchmarks_csv(request: Request) -> StreamingResponse:
         ["clinic_name", "business_type", "appointments", "calls", "conversion_rate", "estimated_revenue_recovered", "open_tasks"],
         rows,
     )
+
+
+@app.get("/api/export/business-pack.csv")
+async def export_business_pack_csv(request: Request) -> StreamingResponse:
+    require_authenticated_api(request)
+    clinic_id = get_active_clinic_id(request)
+    analytics = fetch_analytics(clinic_id)
+    settings = fetch_clinic_settings(clinic_id)
+    rows = [
+        {"section": "Clinic", "metric": "Clinic Name", "value": settings["clinic_name"]},
+        {"section": "Clinic", "metric": "Business Type", "value": str(settings.get("business_type", "")).replace("_", " ").title()},
+        {"section": "Revenue", "metric": "Estimated Revenue Recovered", "value": analytics["estimated_revenue_recovered"]},
+        {"section": "Revenue", "metric": "Estimated Revenue Realized", "value": analytics["estimated_revenue_realized"]},
+        {"section": "Revenue", "metric": "Pipeline Revenue At Risk", "value": analytics["pipeline_revenue_at_risk"]},
+        {"section": "Operations", "metric": "Open Tasks", "value": analytics["totals"]["open_tasks"]},
+        {"section": "Operations", "metric": "Pending Reminders", "value": analytics["totals"]["pending_reminders"]},
+        {"section": "Conversion", "metric": "Conversion Rate", "value": analytics["conversion_rate"]},
+        {"section": "Conversion", "metric": "Completion Rate", "value": analytics["completion_rate"]},
+    ]
+    return csv_response("dentvoice-business-pack.csv", ["section", "metric", "value"], rows)
+
+
+async def _import_csv_rows(file: UploadFile) -> list[dict[str, str]]:
+    payload = await file.read()
+    try:
+        text = payload.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from exc
+    rows = list(csv.DictReader(io.StringIO(text)))
+    if not rows:
+        raise HTTPException(status_code=400, detail="The uploaded CSV is empty.")
+    return [{str(key).strip(): str(value or "").strip() for key, value in row.items()} for row in rows]
+
+
+@app.post("/api/import/{entity_type}")
+async def import_csv_data(
+    request: Request,
+    entity_type: str,
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    rows = await _import_csv_rows(file)
+    created_count = 0
+    now_iso = datetime.now(UTC).isoformat()
+    with get_db() as db:
+        if entity_type == "appointments":
+            for row in rows:
+                preferred_date = row.get("preferred_date") or datetime.now(UTC).date().isoformat()
+                preferred_time = row.get("preferred_time") or "10:00 AM"
+                check_double_booking(preferred_date, preferred_time, clinic_id=clinic_id)
+                db.execute(
+                    """
+                    INSERT INTO appointments (id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at, clinic_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        row.get("patient_name") or "Imported Patient",
+                        row.get("phone_number") or "",
+                        preferred_date,
+                        preferred_time,
+                        row.get("reason_for_visit") or "Imported appointment",
+                        row.get("status") or "new",
+                        row.get("source") or "admin",
+                        row.get("notes") or "",
+                        row.get("created_at") or now_iso,
+                        clinic_id,
+                    ),
+                )
+                created_count += 1
+        elif entity_type == "leads":
+            for row in rows:
+                db.execute(
+                    """
+                    INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, status, owner_notes, business_type, tags, assignee_username, lost_reason, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        row.get("name") or "Imported Lead",
+                        row.get("clinic_name") or fetch_clinic_settings(clinic_id)["clinic_name"],
+                        row.get("phone_number") or "",
+                        row.get("message") or "Imported lead",
+                        row.get("status") or "new",
+                        row.get("owner_notes") or "",
+                        row.get("business_type") or fetch_clinic_settings(clinic_id).get("business_type", "dental"),
+                        row.get("tags") or "",
+                        row.get("assignee_username") or "",
+                        row.get("lost_reason") or "",
+                        row.get("created_at") or now_iso,
+                    ),
+                )
+                created_count += 1
+        elif entity_type == "patients":
+            for row in rows:
+                db.execute(
+                    """
+                    INSERT INTO appointments (id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at, clinic_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        row.get("patient_name") or "Imported Patient",
+                        row.get("phone_number") or "",
+                        row.get("latest_visit_date") or datetime.now(UTC).date().isoformat(),
+                        row.get("preferred_time") or "11:00 AM",
+                        row.get("latest_reason") or "Imported patient history",
+                        row.get("latest_status") or "completed",
+                        "admin",
+                        row.get("notes_preview") or "",
+                        row.get("created_at") or now_iso,
+                        clinic_id,
+                    ),
+                )
+                created_count += 1
+        else:
+            raise HTTPException(status_code=404, detail="Unsupported import type.")
+        db.commit()
+    create_notification(clinic_id, "CSV import complete", f"Imported {created_count} {entity_type}.", "/exports")
+    log_access_event(request, clinic_id, str(request.session.get("dentvoice_username") or ""), str(request.session.get("dentvoice_role") or ""), "csv_import", entity_type)
+    return JSONResponse({"message": f"Imported {created_count} {entity_type}."})
+
+
+@app.post("/api/duplicates/cleanup")
+async def cleanup_duplicates(
+    request: Request,
+    target_type: str = Form(...),
+    key: str = Form(...),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    removed = 0
+    with get_db() as db:
+        if target_type == "leads":
+            rows = db.execute(
+                """
+                SELECT id, name, clinic_name, phone_number, message, status, owner_notes, business_type, tags, assignee_username, lost_reason, created_at
+                FROM contact_requests
+                WHERE phone_number = ?
+                ORDER BY datetime(created_at) DESC
+                """,
+                (key,),
+            ).fetchall()
+            keep = rows[:1]
+            for row in rows[1:]:
+                archive_record("lead", row["id"], dict(row), clinic_id=clinic_id)
+                db.execute("DELETE FROM contact_requests WHERE id = ?", (row["id"],))
+                removed += 1
+        elif target_type == "patients":
+            rows = db.execute(
+                """
+                SELECT id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at, clinic_id
+                FROM appointments
+                WHERE phone_number = ?
+                ORDER BY datetime(created_at) DESC
+                """,
+                (key,),
+            ).fetchall()
+            seen_pairs: set[tuple[str, str, str]] = set()
+            for row in rows:
+                identity = (row["phone_number"], row["preferred_date"], row["preferred_time"])
+                if identity in seen_pairs:
+                    archive_record("appointment", row["id"], dict(row), clinic_id=clinic_id)
+                    db.execute("DELETE FROM appointments WHERE id = ?", (row["id"],))
+                    removed += 1
+                    continue
+                seen_pairs.add(identity)
+        else:
+            raise HTTPException(status_code=400, detail="Unknown duplicate target.")
+        db.commit()
+    return JSONResponse({"message": f"Cleaned up {removed} duplicate record(s)."})
+
+
+@app.post("/api/archive")
+async def archive_entity(
+    request: Request,
+    entity_type: str = Form(...),
+    entity_id: str = Form(...),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        if entity_type == "lead":
+            row = db.execute("SELECT * FROM contact_requests WHERE id = ?", (entity_id,)).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Lead not found")
+            archive_record(entity_type, entity_id, dict(row), clinic_id=clinic_id)
+            db.execute("DELETE FROM contact_requests WHERE id = ?", (entity_id,))
+        elif entity_type == "task":
+            row = db.execute("SELECT * FROM receptionist_tasks WHERE id = ? AND clinic_id = ?", (entity_id, clinic_id)).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            archive_record(entity_type, entity_id, dict(row), clinic_id=clinic_id)
+            db.execute("DELETE FROM receptionist_tasks WHERE id = ? AND clinic_id = ?", (entity_id, clinic_id))
+        elif entity_type == "reminder":
+            row = db.execute("SELECT * FROM reminder_queue WHERE id = ? AND clinic_id = ?", (entity_id, clinic_id)).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Reminder not found")
+            archive_record(entity_type, entity_id, dict(row), clinic_id=clinic_id)
+            db.execute("DELETE FROM reminder_queue WHERE id = ? AND clinic_id = ?", (entity_id, clinic_id))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported archive type.")
+        db.commit()
+    return JSONResponse({"message": f"{entity_type.title()} archived"})
+
+
+@app.post("/api/archive/{archive_id}/restore")
+async def restore_archived_entity(request: Request, archive_id: str) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    with get_db() as db:
+        row = db.execute(
+            "SELECT entity_type, payload_json FROM archived_records WHERE id = ? AND clinic_id = ?",
+            (archive_id, clinic_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Archive record not found")
+        payload = json.loads(row["payload_json"])
+        entity_type = row["entity_type"]
+        if entity_type == "lead":
+            db.execute(
+                """
+                INSERT OR REPLACE INTO contact_requests (id, name, clinic_name, phone_number, message, status, owner_notes, business_type, tags, assignee_username, lost_reason, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["id"],
+                    payload["name"],
+                    payload["clinic_name"],
+                    payload["phone_number"],
+                    payload["message"],
+                    payload.get("status", "new"),
+                    payload.get("owner_notes", ""),
+                    payload.get("business_type", ""),
+                    payload.get("tags", ""),
+                    payload.get("assignee_username", ""),
+                    payload.get("lost_reason", ""),
+                    payload.get("created_at", datetime.now(UTC).isoformat()),
+                ),
+            )
+        elif entity_type == "task":
+            db.execute(
+                """
+                INSERT OR REPLACE INTO receptionist_tasks (id, patient_name, phone_number, note, due_date, status, priority, tags, assignee_username, related_appointment_id, created_at, clinic_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["id"],
+                    payload["patient_name"],
+                    payload["phone_number"],
+                    payload["note"],
+                    payload["due_date"],
+                    payload["status"],
+                    payload.get("priority", "medium"),
+                    payload.get("tags", ""),
+                    payload.get("assignee_username", ""),
+                    payload.get("related_appointment_id"),
+                    payload.get("created_at", datetime.now(UTC).isoformat()),
+                    clinic_id,
+                ),
+            )
+        elif entity_type == "reminder":
+            db.execute(
+                """
+                INSERT OR REPLACE INTO reminder_queue (id, appointment_id, patient_name, phone_number, reminder_type, scheduled_for, status, note, assignee_username, created_at, clinic_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["id"],
+                    payload["appointment_id"],
+                    payload["patient_name"],
+                    payload["phone_number"],
+                    payload["reminder_type"],
+                    payload["scheduled_for"],
+                    payload["status"],
+                    payload["note"],
+                    payload.get("assignee_username", ""),
+                    payload.get("created_at", datetime.now(UTC).isoformat()),
+                    clinic_id,
+                ),
+            )
+        elif entity_type == "appointment":
+            db.execute(
+                """
+                INSERT OR REPLACE INTO appointments (id, patient_name, phone_number, preferred_date, preferred_time, reason_for_visit, status, source, notes, created_at, clinic_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["id"],
+                    payload["patient_name"],
+                    payload["phone_number"],
+                    payload["preferred_date"],
+                    payload["preferred_time"],
+                    payload["reason_for_visit"],
+                    payload["status"],
+                    payload["source"],
+                    payload.get("notes", ""),
+                    payload.get("created_at", datetime.now(UTC).isoformat()),
+                    clinic_id,
+                ),
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported restore type.")
+        db.execute("DELETE FROM archived_records WHERE id = ? AND clinic_id = ?", (archive_id, clinic_id))
+        db.commit()
+    return JSONResponse({"message": "Record restored"})
+
+
+@app.post("/api/cleanup")
+async def run_cleanup_tool(
+    request: Request,
+    action: str = Form(...),
+) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    affected = 0
+    with get_db() as db:
+        if action == "clear_read_notifications":
+            result = db.execute("DELETE FROM app_notifications WHERE clinic_id = ? AND is_read = 1", (clinic_id,))
+            affected = result.rowcount
+        elif action == "archive_done_tasks":
+            rows = db.execute("SELECT * FROM receptionist_tasks WHERE clinic_id = ? AND status = 'done'", (clinic_id,)).fetchall()
+            for row in rows:
+                archive_record("task", row["id"], dict(row), clinic_id=clinic_id)
+                db.execute("DELETE FROM receptionist_tasks WHERE id = ? AND clinic_id = ?", (row["id"], clinic_id))
+                affected += 1
+        elif action == "archive_sent_reminders":
+            rows = db.execute("SELECT * FROM reminder_queue WHERE clinic_id = ? AND status = 'sent'", (clinic_id,)).fetchall()
+            for row in rows:
+                archive_record("reminder", row["id"], dict(row), clinic_id=clinic_id)
+                db.execute("DELETE FROM reminder_queue WHERE id = ? AND clinic_id = ?", (row["id"], clinic_id))
+                affected += 1
+        else:
+            raise HTTPException(status_code=400, detail="Unknown cleanup action.")
+        db.commit()
+    return JSONResponse({"message": f"Cleanup complete for {affected} record(s)."})
+
+
+@app.post("/api/tags/bulk-update")
+async def bulk_update_tags(
+    request: Request,
+    target_type: str = Form(...),
+    record_ids: str = Form(...),
+    tags: str = Form(default=""),
+) -> JSONResponse:
+    require_manager_or_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    ids = [item.strip() for item in record_ids.split(",") if item.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="No records selected.")
+    placeholders = ",".join("?" for _ in ids)
+    params: list[object]
+    query: str
+    if target_type == "leads":
+        query = f"UPDATE contact_requests SET tags = ? WHERE id IN ({placeholders})"
+        params = [tags, *ids]
+    elif target_type == "tasks":
+        query = f"UPDATE receptionist_tasks SET tags = ? WHERE clinic_id = ? AND id IN ({placeholders})"
+        params = [tags, clinic_id, *ids]
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported tag update target.")
+    with get_db() as db:
+        db.execute(query, params)
+        db.commit()
+    return JSONResponse({"message": "Tags updated"})
 
 
 @app.post("/voice/incoming")
