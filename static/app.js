@@ -438,6 +438,8 @@ document.getElementById("settings-form")?.addEventListener("submit", async (even
       brand_tagline: form.brand_tagline.value,
       accent_color: form.accent_color.value,
       logo_text: form.logo_text.value,
+      business_type: form.business_type.value,
+      avg_booking_value: Number(form.avg_booking_value.value || 0),
       working_days: form.working_days.value,
       working_hours: form.working_hours.value,
       auto_callback_enabled: form.auto_callback_enabled.checked,
@@ -467,6 +469,19 @@ document.querySelectorAll(".slot-delete").forEach((button) => {
     try {
       await postForm(`/api/slots/${button.dataset.slotId}/delete`, new FormData());
       refreshPage("Slot removed");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
+});
+
+document.querySelectorAll(".template-apply-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      await postForm("/api/templates/apply", formData);
+      refreshPage("Industry template applied");
     } catch (error) {
       showToast(error.message, "error");
     }

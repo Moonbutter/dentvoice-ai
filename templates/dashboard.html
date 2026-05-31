@@ -18,7 +18,7 @@
         <div class="brand-lockup">
           <div class="logo-badge">{{ branding.logo_text }}</div>
           <div>
-        <p class="eyebrow">AI Receptionist for Dental Clinics</p>
+        <p class="eyebrow">Revenue Recovery Workspace</p>
         <h1>{{ settings.clinic_name }}</h1>
           </div>
         </div>
@@ -73,6 +73,10 @@
             </div>
             <div class="split-grid">
               <label><span>Logo text</span><input name="logo_text" maxlength="4" value="DV" required></label>
+              <label><span>Business type</span><select name="business_type">{% for item in business_types %}<option value="{{ item }}">{{ industry_templates[item].label }}</option>{% endfor %}</select></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Average booking value (₹)</span><input type="number" name="avg_booking_value" value="5000" required></label>
               <label><span>Working days</span><input name="working_days" value="Mon,Tue,Wed,Thu,Fri,Sat" required></label>
             </div>
             <div class="split-grid">
@@ -147,6 +151,10 @@
               <label><span>Logo text</span><input name="logo_text" value="{{ branding.logo_text }}" maxlength="4" required></label>
             </div>
             <div class="split-grid">
+              <label><span>Business type</span><select name="business_type">{% for item in business_types %}<option value="{{ item }}" {% if settings.business_type == item %}selected{% endif %}>{{ industry_templates[item].label }}</option>{% endfor %}</select></label>
+              <label><span>Average booking value (₹)</span><input type="number" name="avg_booking_value" value="{{ settings.avg_booking_value }}" required></label>
+            </div>
+            <div class="split-grid">
               <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" required></label>
               <label><span>Working hours</span><input name="working_hours" value="{{ settings.working_hours }}" required></label>
             </div>
@@ -169,8 +177,28 @@
             <div><strong>{{ analytics.conversion_rate }}%</strong><span>Call to booking rate</span></div>
             <div><strong>{{ analytics.completion_rate }}%</strong><span>Completed visits</span></div>
             <div><strong>{{ analytics.hot_lead_rate }}%</strong><span>Hot lead ratio</span></div>
+            <div><strong>₹{{ analytics.estimated_revenue_recovered }}</strong><span>Estimated revenue recovered</span></div>
           </div>
           <a class="secondary-button link-button top-gap-inline" href="/analytics">Open Full Analytics</a>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header"><h2>Company Growth Snapshot</h2><p>Track free-trial momentum and future SaaS revenue</p></div>
+        <div class="panel-body">
+          <div class="mini-metrics">
+            <div class="mini-metric"><strong>{{ company_growth.self_serve_signups }}</strong><span>Self-serve signups</span></div>
+            <div class="mini-metric"><strong>{{ company_growth.active_trials }}</strong><span>Active trials</span></div>
+            <div class="mini-metric"><strong>{{ company_growth.paid_accounts }}</strong><span>Paid accounts</span></div>
+            <div class="mini-metric"><strong>₹{{ company_growth.estimated_mrr }}</strong><span>Estimated MRR</span></div>
+          </div>
+          <div class="kpi-strip top-gap">
+            <div><strong>{{ company_growth.demo_to_paid_rate }}%</strong><span>Signup to paid</span></div>
+            <div><strong>{{ company_growth.lead_to_trial_rate }}%</strong><span>Qualified to trial</span></div>
+            <div><strong>{{ stats.contacts }}</strong><span>Total demo requests</span></div>
+            <div><strong>{{ stats.calls }}</strong><span>Calls captured</span></div>
+          </div>
+          <a class="secondary-button link-button top-gap-inline" href="/leads">Open Lead Pipeline</a>
         </div>
       </article>
 
@@ -216,13 +244,16 @@
                   <div class="task-card-top">
                     <div>
                       <strong>{{ item.name }} - {{ item.clinic_name }}</strong>
+                      {% if item.business_type %}
+                        <span>{{ item.business_type.replace("_", " ").title() }}</span>
+                      {% endif %}
                       <span>{{ item.message }}</span>
                       <span class="muted-line">{{ item.phone_number }}</span>
                     </div>
                     <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
                   </div>
                   <div class="split-grid">
-                    <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.title() }}</option>{% endfor %}</select></label>
+                    <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
                     <label><span>Owner notes</span><input name="owner_notes" value="{{ item.owner_notes }}" placeholder="Reached out, scheduled demo, follow up next week"></label>
                   </div>
                   <div class="row-actions">

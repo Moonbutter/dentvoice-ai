@@ -33,6 +33,9 @@ DentVoice AI is a lightweight MVP for an AI receptionist and revenue-recovery pl
 - Visual analytics with chart-style summaries
 - ROI calculator and pricing-led landing page
 - Admin setup workspace checklist
+- Industry template library for dental, dermatology, physiotherapy, real estate, and salons
+- Revenue-recovered analytics and trial-to-paid growth tracking
+- Lead pipeline board for demo requests and SaaS conversion stages
 
 ## Project Structure
 
@@ -68,6 +71,7 @@ uvicorn app.main:app --reload
 - `GET /dashboard` - Admin dashboard
 - `GET /login` - Local clinic admin login
 - `GET /setup` - Admin workspace setup checklist
+- `GET /leads` - Demo request CRM and lead pipeline
 - `GET /appointments` - Appointment management page
 - `GET /calls` - Call management page
 - `GET /analytics` - Analytics page

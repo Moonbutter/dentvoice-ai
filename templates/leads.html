@@ -12,7 +12,7 @@
 <body style="--accent: {{ branding.accent_color }};">
   <main class="page-shell">
     <section class="hero compact-hero">
-      <div><p class="eyebrow">Demo Request CRM</p><h1>Manage inbound interest from clinics.</h1></div>
+      <div><p class="eyebrow">Demo Request CRM</p><h1>Manage inbound interest, trials, and paid conversions.</h1></div>
       <div class="hero-actions"><a class="secondary-button link-button" href="/dashboard">Dashboard</a><a class="secondary-button link-button" href="/missed-leads">Missed Leads</a><form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form></div>
     </section>
 
@@ -20,7 +20,7 @@
       <div class="panel-body">
         <form method="get" action="/leads" class="filter-grid" data-save-filters="leads">
           <label><span>Search lead</span><input name="q" value="{{ filters.q }}" placeholder="Name, clinic, phone, note"></label>
-          <label><span>Status</span><select name="status"><option value="">All</option>{% for item in contact_statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item.title() }}</option>{% endfor %}</select></label>
+          <label><span>Status</span><select name="status"><option value="">All</option>{% for item in contact_statuses %}<option value="{{ item }}" {% if filters.status == item %}selected{% endif %}>{{ item.replace("_", " ").title() }}</option>{% endfor %}</select></label>
           <label><span>Sort</span><select name="sort"><option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest first</option><option value="status" {% if filters.sort == "status" %}selected{% endif %}>By status</option><option value="name" {% if filters.sort == "name" %}selected{% endif %}>Name A-Z</option></select></label>
           <div class="form-actions-row">
             <button type="submit" class="primary-button">Apply</button>
@@ -32,6 +32,28 @@
       </div>
     </section>
 
+    <section class="pipeline-grid">
+      {% for status_name in contact_statuses %}
+        <article class="panel pipeline-column">
+          <div class="panel-header">
+            <h2>{{ status_name.replace("_", " ").title() }}</h2>
+            <p>{{ lead_pipeline[status_name]|length }} leads in this stage</p>
+          </div>
+          <div class="panel-body stack-list">
+            {% for item in lead_pipeline[status_name][:5] %}
+              <div class="card-form">
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.clinic_name }}</span>
+                <span class="muted-line">{{ item.phone_number }}</span>
+              </div>
+            {% else %}
+              <p class="empty-state">No leads here yet.</p>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+
     <section class="content-grid">
       {% for item in contact_requests %}
         <article class="panel">
@@ -41,12 +63,15 @@
                 <div>
                   <strong>{{ item.name }}</strong>
                   <span>{{ item.clinic_name }}</span>
+                  {% if item.business_type %}
+                    <span class="muted-line">{{ item.business_type.replace("_", " ").title() }}</span>
+                  {% endif %}
                   <span class="muted-line">{{ item.phone_number }}</span>
                 </div>
-                <span class="pill">{{ item.status.title() }}</span>
+                <span class="pill">{{ item.status.replace("_", " ").title() }}</span>
               </div>
               <p class="message-paragraph">{{ item.message }}</p>
-              <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.title() }}</option>{% endfor %}</select></label>
+              <label><span>Status</span><select name="status">{% for contact_status in contact_statuses %}<option value="{{ contact_status }}" {% if item.status == contact_status %}selected{% endif %}>{{ contact_status.replace("_", " ").title() }}</option>{% endfor %}</select></label>
               <label><span>Owner notes</span><textarea name="owner_notes" rows="4" placeholder="Called clinic manager, waiting for trial slot, send brochure tomorrow">{{ item.owner_notes }}</textarea></label>
               <button type="submit" class="primary-button">Update Lead</button>
             </form>

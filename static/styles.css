@@ -256,6 +256,13 @@ button:hover,
   gap: 18px;
 }
 
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 22px;
+}
+
 .single-column {
   grid-template-columns: 1fr;
 }
@@ -361,6 +368,15 @@ button:hover,
 .pricing-card.featured {
   border-color: rgba(124, 63, 29, 0.3);
   background: linear-gradient(180deg, rgba(255, 246, 238, 0.96), rgba(255, 255, 255, 0.94));
+}
+
+.template-apply-form {
+  display: grid;
+  gap: 12px;
+}
+
+.pipeline-column .panel-body {
+  min-height: 240px;
 }
 
 .filter-panel {

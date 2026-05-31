@@ -60,6 +60,30 @@
     </section>
 
     <section class="content-grid">
+      <article class="panel panel-span-two" id="template-library">
+        <div class="panel-header">
+          <h2>Industry Template Library</h2>
+          <p>Pick the closest vertical to preload the right copy, hours, FAQs, and benchmark value</p>
+        </div>
+        <div class="panel-body">
+          <div class="pricing-grid">
+            {% for key, template in industry_templates.items() %}
+              <form class="template-apply-form pricing-card{% if settings.business_type == key %} featured{% endif %}">
+                <input type="hidden" name="business_type" value="{{ key }}">
+                <p class="landing-card-label">{{ template.label }}</p>
+                <h3>₹{{ template.avg_booking_value }} avg booking value</h3>
+                <p class="message-paragraph">{{ template.tagline }}</p>
+                <ul class="feature-list">
+                  <li>{{ template.timings_label }}</li>
+                  <li>{{ template.working_days }}</li>
+                </ul>
+                <button type="submit" class="secondary-button">Apply Template</button>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+
       <article class="panel panel-span-two">
         <div class="panel-header">
           <h2>Workspace Checklist</h2>
@@ -99,6 +123,10 @@
             <div class="split-grid">
               <label><span>Accent color</span><input type="color" name="accent_color" value="{{ branding.accent_color }}" required></label>
               <label><span>Logo text</span><input name="logo_text" value="{{ branding.logo_text }}" maxlength="4" required></label>
+            </div>
+            <div class="split-grid">
+              <label><span>Business type</span><select name="business_type">{% for item in business_types %}<option value="{{ item }}" {% if settings.business_type == item %}selected{% endif %}>{{ industry_templates[item].label }}</option>{% endfor %}</select></label>
+              <label><span>Average booking value (₹)</span><input type="number" name="avg_booking_value" value="{{ settings.avg_booking_value }}" required></label>
             </div>
             <div class="split-grid">
               <label><span>Working days</span><input name="working_days" value="{{ settings.working_days }}" placeholder="Mon,Tue,Wed,Thu,Fri,Sat" required></label>
@@ -179,9 +207,9 @@
         <div class="panel-body">
           <ul class="feature-list">
             <li>Load demo data before sales calls so analytics and reminders look active.</li>
-            <li>Use clinic-specific branding to make each landing page look personalized.</li>
+            <li>Use the template library to make each workspace feel vertical-specific before outreach.</li>
             <li>Capture every inbound inquiry through the public page and the demo CRM.</li>
-            <li>Once free activation looks strong, layer in paid calling and messaging later.</li>
+            <li>Track recovered revenue and free-trial pipeline before layering in paid calling and messaging.</li>
           </ul>
         </div>
       </article>

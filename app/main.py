@@ -98,6 +98,8 @@ class ClinicSettingsInput(BaseModel):
     brand_tagline: str
     accent_color: str
     logo_text: str
+    business_type: str
+    avg_booking_value: int
     working_days: str
     working_hours: str
     auto_callback_enabled: bool
@@ -105,7 +107,7 @@ class ClinicSettingsInput(BaseModel):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "dentvoice.db"
-ASSET_VERSION = "20260531-1"
+ASSET_VERSION = "20260531-2"
 
 FAQS = [
     FAQAnswer(question="What are your clinic timings?", answer="We are open Monday to Saturday from 9 AM to 8 PM."),
@@ -114,13 +116,87 @@ FAQS = [
     FAQAnswer(question="Is a consultation available today?", answer="Same-day consultation depends on doctor availability, and we can help request a slot."),
 ]
 
+INDUSTRY_TEMPLATES = {
+    "dental": {
+        "label": "Dental Clinics",
+        "accent_color": "#146c78",
+        "tagline": "AI front desk for missed patient calls and chairside booking recovery",
+        "working_days": "Mon,Tue,Wed,Thu,Fri,Sat",
+        "working_hours": "09:00-20:00",
+        "avg_booking_value": 8000,
+        "timings_label": "Monday to Saturday, 9 AM to 8 PM",
+        "faqs": [
+            FAQAnswer(question="Do you handle braces and aligners?", answer="Yes, the clinic offers braces, aligners, and smile-design consultations."),
+            FAQAnswer(question="Can I book a cleaning or pain consultation today?", answer="Same-day appointments depend on doctor availability, but the receptionist can request the earliest available slot."),
+            FAQAnswer(question="Do you offer implants and cosmetic dentistry?", answer="Yes, the clinic supports implants, cosmetic dentistry, and treatment-planning consultations."),
+        ],
+    },
+    "dermatology": {
+        "label": "Dermatology / Cosmetic Clinics",
+        "accent_color": "#9b5de5",
+        "tagline": "AI front desk for high-value skin, hair, and aesthetic inquiries",
+        "working_days": "Mon,Tue,Wed,Thu,Fri,Sat",
+        "working_hours": "10:00-20:00",
+        "avg_booking_value": 25000,
+        "timings_label": "Monday to Saturday, 10 AM to 8 PM",
+        "faqs": [
+            FAQAnswer(question="Do you offer skin and hair consultations?", answer="Yes, the clinic handles skin, hair, and cosmetic consultation requests."),
+            FAQAnswer(question="Can I ask about treatment pricing?", answer="Yes, pricing guidance can be shared and a consultation slot can be requested for a detailed plan."),
+            FAQAnswer(question="Do you handle after-hours inquiry follow-up?", answer="Yes, the clinic can capture your details and route the follow-up to the team."),
+        ],
+    },
+    "physiotherapy": {
+        "label": "Physiotherapy Clinics",
+        "accent_color": "#2a9d8f",
+        "tagline": "AI appointment desk for repeat therapy scheduling and callback recovery",
+        "working_days": "Mon,Tue,Wed,Thu,Fri,Sat",
+        "working_hours": "08:00-19:00",
+        "avg_booking_value": 3000,
+        "timings_label": "Monday to Saturday, 8 AM to 7 PM",
+        "faqs": [
+            FAQAnswer(question="Do you handle sports injury and pain sessions?", answer="Yes, the clinic can capture therapy requests for pain relief, mobility, and sports recovery."),
+            FAQAnswer(question="Can I reschedule a therapy session?", answer="Yes, the receptionist can help request a new session time."),
+            FAQAnswer(question="Do repeat sessions need reminders?", answer="Yes, reminder workflows can support follow-up therapy appointments."),
+        ],
+    },
+    "real_estate": {
+        "label": "Real Estate Teams",
+        "accent_color": "#c75c2a",
+        "tagline": "AI lead desk for missed property inquiries and site-visit scheduling",
+        "working_days": "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+        "working_hours": "09:00-21:00",
+        "avg_booking_value": 50000,
+        "timings_label": "All week, 9 AM to 9 PM",
+        "faqs": [
+            FAQAnswer(question="Can I ask about budget and location fit?", answer="Yes, the receptionist can capture budget, preferred location, and site-visit requests."),
+            FAQAnswer(question="Can a broker call me back later?", answer="Yes, missed lead recovery tasks can be created automatically for broker follow-up."),
+            FAQAnswer(question="Can I book a site visit?", answer="Yes, the workflow can capture and route site-visit interest."),
+        ],
+    },
+    "salon": {
+        "label": "Salons / Spas",
+        "accent_color": "#d97706",
+        "tagline": "AI booking desk for peak-hour appointments and repeat customer recovery",
+        "working_days": "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+        "working_hours": "10:00-21:00",
+        "avg_booking_value": 2500,
+        "timings_label": "All week, 10 AM to 9 PM",
+        "faqs": [
+            FAQAnswer(question="Can I book a weekend slot?", answer="Yes, the receptionist can capture weekend booking requests and preferred times."),
+            FAQAnswer(question="Do you handle bridal or premium services?", answer="Yes, premium service inquiries can be captured and routed for follow-up."),
+            FAQAnswer(question="Can someone confirm my booking later?", answer="Yes, reminder and callback workflows can support the booking process."),
+        ],
+    },
+}
+
 APPOINTMENT_STATUSES = ["new", "confirmed", "completed", "cancelled", "needs_follow_up"]
 CALL_INTENTS = ["appointment_booking", "reschedule", "pricing", "directions", "faq", "emergency", "general"]
 LEAD_SCORES = ["hot", "warm", "cold"]
 TASK_STATUSES = ["open", "in_progress", "done"]
 TASK_PRIORITIES = ["high", "medium", "low"]
 APPOINTMENT_SOURCES = ["admin", "voice_call", "simulated_call", "api"]
-CONTACT_STATUSES = ["new", "contacted", "qualified", "closed"]
+CONTACT_STATUSES = ["new", "contacted", "qualified", "demo_booked", "trial_active", "paid", "closed"]
+BUSINESS_TYPES = list(INDUSTRY_TEMPLATES.keys())
 
 call_sessions: dict[str, CallSession] = {}
 
@@ -189,6 +265,8 @@ def init_db() -> None:
                 brand_tagline TEXT NOT NULL,
                 accent_color TEXT NOT NULL,
                 logo_text TEXT NOT NULL,
+                business_type TEXT NOT NULL DEFAULT 'dental',
+                avg_booking_value INTEGER NOT NULL DEFAULT 5000,
                 working_days TEXT NOT NULL DEFAULT 'Mon,Tue,Wed,Thu,Fri,Sat',
                 working_hours TEXT NOT NULL DEFAULT '09:00-20:00',
                 auto_callback_enabled INTEGER NOT NULL DEFAULT 1
@@ -313,10 +391,16 @@ def init_db() -> None:
             db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_username TEXT NOT NULL DEFAULT 'admin'")
         if not column_exists(db, "clinic_settings", "admin_password"):
             db.execute("ALTER TABLE clinic_settings ADD COLUMN admin_password TEXT NOT NULL DEFAULT 'dentvoice123'")
+        if not column_exists(db, "clinics", "business_type"):
+            db.execute("ALTER TABLE clinics ADD COLUMN business_type TEXT NOT NULL DEFAULT 'dental'")
+        if not column_exists(db, "clinics", "avg_booking_value"):
+            db.execute("ALTER TABLE clinics ADD COLUMN avg_booking_value INTEGER NOT NULL DEFAULT 5000")
         if not column_exists(db, "contact_requests", "status"):
             db.execute("ALTER TABLE contact_requests ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
         if not column_exists(db, "contact_requests", "owner_notes"):
             db.execute("ALTER TABLE contact_requests ADD COLUMN owner_notes TEXT NOT NULL DEFAULT ''")
+        if not column_exists(db, "contact_requests", "business_type"):
+            db.execute("ALTER TABLE contact_requests ADD COLUMN business_type TEXT NOT NULL DEFAULT ''")
         if not column_exists(db, "receptionist_tasks", "priority"):
             db.execute("ALTER TABLE receptionist_tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'")
         if not column_exists(db, "call_records", "internal_notes"):
@@ -356,8 +440,8 @@ def init_db() -> None:
             ).fetchone()
             db.execute(
                 """
-                INSERT INTO clinics (id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                INSERT INTO clinics (id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours, auto_callback_enabled)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'dental', 5000, ?, ?, 1)
                 """,
                 (
                     "smile-dental-clinic",
@@ -438,7 +522,7 @@ def fetch_clinics() -> list[dict[str, object]]:
     with get_db() as db:
         rows = db.execute(
             """
-            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled
+            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours, auto_callback_enabled
             FROM clinics
             ORDER BY clinic_name ASC
             """
@@ -450,7 +534,7 @@ def fetch_clinic_settings(clinic_id: int = 1) -> dict[str, str]:
     with get_db() as db:
         row = db.execute(
             """
-            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled
+            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours, auto_callback_enabled
             FROM clinics
             WHERE id = ?
             """
@@ -464,7 +548,7 @@ def fetch_clinic_by_slug(slug: str) -> dict[str, str] | None:
     with get_db() as db:
         row = db.execute(
             """
-            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled
+            SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours, auto_callback_enabled
             FROM clinics
             WHERE slug = ?
             """,
@@ -482,16 +566,18 @@ def create_clinic_workspace(
     brand_tagline: str,
     accent_color: str,
     logo_text: str,
+    business_type: str,
+    avg_booking_value: int,
     working_days: str,
     working_hours: str,
 ) -> dict[str, object]:
     with get_db() as db:
         cursor = db.execute(
             """
-            INSERT INTO clinics (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours, auto_callback_enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO clinics (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours, auto_callback_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
-            (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, working_days, working_hours),
+            (slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, working_days, working_hours),
         )
         clinic_id = int(cursor.lastrowid)
         admin_username = f"{slug}-admin"
@@ -507,7 +593,8 @@ def create_clinic_workspace(
         for slot in default_slots({"working_hours": working_hours}):
             db.execute("INSERT INTO slots (slot_date, slot_time, clinic_id) VALUES (?, ?, ?)", (slot["date"], slot["time"], clinic_id))
         created_at = datetime.now(UTC).isoformat()
-        for index, item in enumerate(FAQS):
+        template_faqs = INDUSTRY_TEMPLATES.get(business_type, INDUSTRY_TEMPLATES["dental"])["faqs"]
+        for index, item in enumerate(template_faqs):
             db.execute(
                 "INSERT INTO faq_entries (question, answer, sort_order, created_at, clinic_id) VALUES (?, ?, ?, ?, ?)",
                 (item.question, item.answer, index, created_at, clinic_id),
@@ -677,7 +764,7 @@ def fetch_contact_requests(limit: int = 20, search: str = "", status: str = "", 
         order_clause = "ORDER BY name ASC"
 
     query = f"""
-        SELECT id, name, clinic_name, phone_number, message, status, owner_notes, created_at
+        SELECT id, name, clinic_name, phone_number, message, status, owner_notes, business_type, created_at
         FROM contact_requests
         {where_clause}
         {order_clause}
@@ -1046,6 +1133,8 @@ def fetch_analytics(clinic_id: int = 1) -> dict[str, object]:
     contacts = fetch_contact_requests(limit=1000)
     tasks = fetch_receptionist_tasks(limit=1000, clinic_id=clinic_id)
     reminders = fetch_reminders(limit=1000, clinic_id=clinic_id)
+    settings = fetch_clinic_settings(clinic_id)
+    avg_booking_value = int(settings.get("avg_booking_value", 5000) or 5000)
 
     appointments_by_status = Counter(item.status for item in appointments)
     appointments_by_source = Counter(item.source for item in appointments)
@@ -1069,6 +1158,13 @@ def fetch_analytics(clinic_id: int = 1) -> dict[str, object]:
                 "contacts": sum(1 for item in contacts if item["created_at"][:10] == iso_day),
             }
         )
+
+    protected_appointments = [item for item in appointments if item.status != "cancelled"]
+    completed_appointments = [item for item in appointments if item.status == "completed"]
+    hot_calls = [item for item in calls if item.lead_score == "hot"]
+    estimated_revenue_recovered = len(protected_appointments) * avg_booking_value
+    estimated_revenue_realized = len(completed_appointments) * avg_booking_value
+    pipeline_revenue_at_risk = len(hot_calls) * avg_booking_value
 
     return {
         "totals": {
@@ -1094,6 +1190,10 @@ def fetch_analytics(clinic_id: int = 1) -> dict[str, object]:
         "conversion_rate": round((len(appointments) / len(calls)) * 100, 1) if calls else 0.0,
         "completion_rate": round((appointments_by_status.get("completed", 0) / len(appointments)) * 100, 1) if appointments else 0.0,
         "hot_lead_rate": round((calls_by_lead_score.get("hot", 0) / len(calls)) * 100, 1) if calls else 0.0,
+        "avg_booking_value": avg_booking_value,
+        "estimated_revenue_recovered": estimated_revenue_recovered,
+        "estimated_revenue_realized": estimated_revenue_realized,
+        "pipeline_revenue_at_risk": pipeline_revenue_at_risk,
     }
 
 
@@ -1287,14 +1387,9 @@ def normalize_branding(settings: dict[str, str]) -> dict[str, str]:
 
 
 def build_default_tagline(clinic_name: str, business_type: str) -> str:
-    if business_type == "real_estate":
-        return f"AI front desk for {clinic_name} lead capture"
-    if business_type == "salon":
-        return f"AI booking desk for {clinic_name}"
-    if business_type == "dermatology":
-        return f"AI front desk for {clinic_name} consultations"
-    if business_type == "physiotherapy":
-        return f"AI appointment desk for {clinic_name}"
+    template = INDUSTRY_TEMPLATES.get(business_type)
+    if template:
+        return str(template["tagline"]).replace("the clinic", clinic_name)
     return f"AI front desk for {clinic_name}"
 
 
@@ -1558,6 +1653,12 @@ def build_setup_progress(clinic_id: int = 1) -> dict[str, object]:
 
     steps = [
         {
+            "label": "Apply an industry template",
+            "done": bool(settings.get("business_type")),
+            "hint": "Choose the closest vertical so the copy, hours, FAQs, and benchmark values feel specific.",
+            "href": "/setup#template-library",
+        },
+        {
             "label": "Brand the clinic page",
             "done": bool(settings.get("brand_tagline") and settings.get("logo_text") and settings.get("accent_color")),
             "hint": "Set the clinic name, tagline, logo text, and accent color so the landing page looks client-ready.",
@@ -1605,11 +1706,32 @@ def build_setup_progress(clinic_id: int = 1) -> dict[str, object]:
     return {"steps": steps, "completed": completed, "total": len(steps), "percent": percent}
 
 
+def build_company_growth_metrics() -> dict[str, object]:
+    contacts = fetch_contact_requests(limit=5000)
+    paid_accounts = sum(1 for item in contacts if item["status"] == "paid")
+    active_trials = sum(1 for item in contacts if item["status"] in {"demo_booked", "trial_active"})
+    self_serve_signups = sum(1 for item in contacts if "Self-serve workspace signup" in item["message"])
+    qualified_leads = sum(1 for item in contacts if item["status"] in {"qualified", "demo_booked", "trial_active", "paid"})
+    demo_to_paid_rate = round((paid_accounts / self_serve_signups) * 100, 1) if self_serve_signups else 0.0
+    lead_to_trial_rate = round((active_trials / qualified_leads) * 100, 1) if qualified_leads else 0.0
+    estimated_mrr = paid_accounts * 4999
+    return {
+        "self_serve_signups": self_serve_signups,
+        "qualified_leads": qualified_leads,
+        "active_trials": active_trials,
+        "paid_accounts": paid_accounts,
+        "demo_to_paid_rate": demo_to_paid_rate,
+        "lead_to_trial_rate": lead_to_trial_rate,
+        "estimated_mrr": estimated_mrr,
+    }
+
+
 def build_dashboard_context(request: Request | None = None, clinic_id: int | None = None) -> dict[str, object]:
     active_clinic_id = clinic_id or get_active_clinic_id(request)
     analytics = fetch_analytics(active_clinic_id)
     settings = fetch_clinic_settings(active_clinic_id)
     branding = normalize_branding(settings)
+    company_growth = build_company_growth_metrics()
     return {
         "stats": analytics["totals"],
         "appointments": fetch_appointments(limit=10, clinic_id=active_clinic_id),
@@ -1632,6 +1754,9 @@ def build_dashboard_context(request: Request | None = None, clinic_id: int | Non
         "branding": branding,
         "notifications": build_notifications(active_clinic_id),
         "setup_progress": build_setup_progress(active_clinic_id),
+        "company_growth": company_growth,
+        "industry_templates": INDUSTRY_TEMPLATES,
+        "business_types": BUSINESS_TYPES,
         "analytics": analytics,
         "chartjs_data": json.dumps(build_chartjs_datasets(analytics)),
         "analytics_charts": {
@@ -1926,10 +2051,12 @@ async def leads_page(
     if redirect_response:
         return redirect_response
     context = build_dashboard_context(request)
+    lead_records = fetch_contact_requests(limit=200, search=q, status=status, sort=sort)
     context.update(
         {
             "page_title": "Demo Request CRM",
-            "contact_requests": fetch_contact_requests(limit=200, search=q, status=status, sort=sort),
+            "contact_requests": lead_records,
+            "lead_pipeline": {item: [lead for lead in lead_records if lead["status"] == item] for item in CONTACT_STATUSES},
             "filters": {"q": q, "status": status, "sort": sort},
             "is_authenticated": True,
         }
@@ -2021,6 +2148,8 @@ async def create_clinic(
     brand_tagline: str = Form(...),
     accent_color: str = Form(...),
     logo_text: str = Form(...),
+    business_type: str = Form(default="dental"),
+    avg_booking_value: int = Form(default=5000),
     working_days: str = Form(...),
     working_hours: str = Form(...),
 ) -> JSONResponse:
@@ -2035,6 +2164,8 @@ async def create_clinic(
         brand_tagline=brand_tagline,
         accent_color=accent_color,
         logo_text=logo_text,
+        business_type=business_type,
+        avg_booking_value=avg_booking_value,
         working_days=working_days,
         working_hours=working_hours,
     )
@@ -2051,32 +2182,28 @@ async def create_trial_signup(
     city: str = Form(...),
 ) -> JSONResponse:
     slug = ensure_unique_slug(clinic_name)
-    accent_map = {
-        "dental": "#146c78",
-        "dermatology": "#9b5de5",
-        "physiotherapy": "#2a9d8f",
-        "real_estate": "#c75c2a",
-        "salon": "#d97706",
-    }
+    template = INDUSTRY_TEMPLATES.get(business_type, INDUSTRY_TEMPLATES["dental"])
     clinic_address = f"{city} · Self-serve demo workspace"
     workspace = create_clinic_workspace(
         slug=slug,
         clinic_name=clinic_name,
-        clinic_timings="Monday to Saturday, 9 AM to 8 PM",
+        clinic_timings=str(template["timings_label"]),
         clinic_address=clinic_address,
         brand_tagline=build_default_tagline(clinic_name, business_type),
-        accent_color=accent_map.get(business_type, "#146c78"),
+        accent_color=str(template["accent_color"]),
         logo_text="DV",
-        working_days="Mon,Tue,Wed,Thu,Fri,Sat",
-        working_hours="09:00-20:00",
+        business_type=business_type,
+        avg_booking_value=int(template["avg_booking_value"]),
+        working_days=str(template["working_days"]),
+        working_hours=str(template["working_hours"]),
     )
     request_id = str(uuid4())
     created_at = datetime.now(UTC).isoformat()
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, status, owner_notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, status, owner_notes, business_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request_id,
@@ -2085,8 +2212,9 @@ async def create_trial_signup(
                 phone_number,
                 f"Self-serve workspace signup\nBusiness type: {business_type}\nCity: {city}\nAuto-generated admin: {workspace['admin_username']}",
                 created_at,
-                "qualified",
+                "trial_active",
                 "Auto-created from public self-serve signup.",
+                business_type,
             ),
         )
         db.commit()
@@ -2116,16 +2244,17 @@ async def create_contact_request(
     clinic_name: str = Form(...),
     phone_number: str = Form(...),
     message: str = Form(...),
+    business_type: str = Form(default=""),
 ) -> JSONResponse:
     request_id = str(uuid4())
     created_at = datetime.now(UTC).isoformat()
     with get_db() as db:
         db.execute(
             """
-            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO contact_requests (id, name, clinic_name, phone_number, message, created_at, business_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (request_id, name, clinic_name, phone_number, message, created_at),
+            (request_id, name, clinic_name, phone_number, message, created_at, business_type),
         )
         db.commit()
     log_audit("create", "contact_request", request_id, f"New demo request from {name} at {clinic_name}.")
@@ -2421,7 +2550,7 @@ async def update_settings(request: Request, payload: ClinicSettingsInput) -> JSO
         db.execute(
             """
             UPDATE clinics
-            SET clinic_name = ?, clinic_timings = ?, clinic_address = ?, brand_tagline = ?, accent_color = ?, logo_text = ?, working_days = ?, working_hours = ?, auto_callback_enabled = ?
+            SET clinic_name = ?, clinic_timings = ?, clinic_address = ?, brand_tagline = ?, accent_color = ?, logo_text = ?, business_type = ?, avg_booking_value = ?, working_days = ?, working_hours = ?, auto_callback_enabled = ?
             WHERE id = ?
             """,
             (
@@ -2431,6 +2560,8 @@ async def update_settings(request: Request, payload: ClinicSettingsInput) -> JSO
                 payload.brand_tagline,
                 payload.accent_color,
                 payload.logo_text,
+                payload.business_type,
+                payload.avg_booking_value,
                 payload.working_days,
                 payload.working_hours,
                 int(payload.auto_callback_enabled),
@@ -2440,6 +2571,44 @@ async def update_settings(request: Request, payload: ClinicSettingsInput) -> JSO
         db.commit()
     log_audit("update", "clinic_settings", str(clinic_id), "Updated clinic settings.", clinic_id=clinic_id)
     return JSONResponse({"message": "Clinic settings updated", "settings": fetch_clinic_settings(clinic_id)})
+
+
+@app.post("/api/templates/apply")
+async def apply_industry_template(request: Request, business_type: str = Form(...)) -> JSONResponse:
+    require_admin(request)
+    clinic_id = get_active_clinic_id(request)
+    template = INDUSTRY_TEMPLATES.get(business_type)
+    if template is None:
+        raise HTTPException(status_code=404, detail="Industry template not found")
+    settings = fetch_clinic_settings(clinic_id)
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE clinics
+            SET business_type = ?, brand_tagline = ?, accent_color = ?, working_days = ?, working_hours = ?, clinic_timings = ?, avg_booking_value = ?
+            WHERE id = ?
+            """,
+            (
+                business_type,
+                str(template["tagline"]),
+                str(template["accent_color"]),
+                str(template["working_days"]),
+                str(template["working_hours"]),
+                str(template["timings_label"]),
+                int(template["avg_booking_value"]),
+                clinic_id,
+            ),
+        )
+        db.execute("DELETE FROM faq_entries WHERE clinic_id = ?", (clinic_id,))
+        created_at = datetime.now(UTC).isoformat()
+        for index, item in enumerate(template["faqs"]):
+            db.execute(
+                "INSERT INTO faq_entries (question, answer, sort_order, created_at, clinic_id) VALUES (?, ?, ?, ?, ?)",
+                (item.question, item.answer, index, created_at, clinic_id),
+            )
+        db.commit()
+    log_audit("update", "industry_template", str(clinic_id), f"Applied {business_type} template to {settings['clinic_name']}.", clinic_id=clinic_id)
+    return JSONResponse({"message": "Industry template applied"})
 
 
 @app.post("/api/receptionist-tasks")
@@ -2632,7 +2801,7 @@ async def export_leads_csv(request: Request) -> StreamingResponse:
     leads = fetch_contact_requests(limit=1000)
     return csv_response(
         "dentvoice-leads.csv",
-        ["id", "name", "clinic_name", "phone_number", "message", "status", "owner_notes", "created_at"],
+        ["id", "name", "clinic_name", "phone_number", "business_type", "message", "status", "owner_notes", "created_at"],
         leads,
     )
 

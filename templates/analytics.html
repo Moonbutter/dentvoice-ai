@@ -14,12 +14,13 @@
     <section class="hero compact-hero">
       <div>
         <p class="eyebrow">Analytics</p>
-        <h1>Understand booking flow, call intent, and lead quality.</h1>
+        <h1>Understand clinic ROI and DentVoice growth together.</h1>
       </div>
       <div class="hero-actions">
         <a class="secondary-button link-button" href="/dashboard">Dashboard</a>
         <a class="secondary-button link-button" href="/appointments">Appointments</a>
         <a class="secondary-button link-button" href="/calls">Calls</a>
+        <a class="secondary-button link-button" href="/leads">Lead CRM</a>
         <a class="secondary-button link-button" href="/reminders">Reminders</a>
         <form method="post" action="/logout"><button type="submit" class="secondary-button">Log Out</button></form>
       </div>
@@ -39,7 +40,32 @@
       <div><strong>{{ analytics.totals.open_tasks }}</strong><span>Open receptionist tasks</span></div>
     </section>
 
+    <section class="kpi-strip analytics-kpis top-gap">
+      <div><strong>₹{{ analytics.estimated_revenue_recovered }}</strong><span>Estimated revenue recovered</span></div>
+      <div><strong>₹{{ analytics.estimated_revenue_realized }}</strong><span>Revenue from completed visits</span></div>
+      <div><strong>₹{{ analytics.pipeline_revenue_at_risk }}</strong><span>Hot-lead value at risk</span></div>
+      <div><strong>₹{{ analytics.avg_booking_value }}</strong><span>Average booking value assumption</span></div>
+    </section>
+
+    <section class="kpi-strip analytics-kpis top-gap">
+      <div><strong>{{ company_growth.self_serve_signups }}</strong><span>Self-serve signups</span></div>
+      <div><strong>{{ company_growth.active_trials }}</strong><span>Active trials</span></div>
+      <div><strong>{{ company_growth.paid_accounts }}</strong><span>Paid accounts</span></div>
+      <div><strong>₹{{ company_growth.estimated_mrr }}</strong><span>Estimated MRR</span></div>
+    </section>
+
     <section class="content-grid">
+      <article class="panel panel-span-two">
+        <div class="panel-header"><h2>Revenue Recovery Story</h2><p>Translate appointment workflow into a business outcome a clinic owner understands</p></div>
+        <div class="panel-body">
+          <ul class="faq-list">
+            <li><strong>Estimated revenue recovered</strong><span>Uses the clinic’s average booking value multiplied by active non-cancelled appointments.</span></li>
+            <li><strong>Revenue realized</strong><span>Shows the value already converted into completed appointments.</span></li>
+            <li><strong>Pipeline at risk</strong><span>Hot inbound calls still need fast follow-up to avoid leakage.</span></li>
+            <li><strong>Company funnel</strong><span>Self-serve signups, active trials, and paid accounts show whether DentVoice itself is becoming a real SaaS company.</span></li>
+          </ul>
+        </div>
+      </article>
       <article class="panel">
         <div class="panel-header"><h2>Appointments by Status</h2><p>Operational state of saved bookings</p></div>
         <div class="panel-body chart-panel-body"><canvas id="appointments-status-chart" height="260"></canvas></div>
@@ -80,6 +106,7 @@
             <li><strong>Source and Intent</strong><span>Helps you understand where demand comes from and what patients usually call about.</span></li>
             <li><strong>Lead Scores</strong><span>Highlights which calls deserve fast follow-up from the clinic team.</span></li>
             <li><strong>7-Day Trend</strong><span>Gives a lightweight activity graph even before adding any paid analytics stack.</span></li>
+            <li><strong>Revenue Metrics</strong><span>Help explain the ROI of the product without needing paid telecom or AI integrations yet.</span></li>
           </ul>
         </div>
       </article>
