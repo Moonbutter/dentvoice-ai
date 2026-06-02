@@ -745,6 +745,12 @@ def fetch_clinics() -> list[dict[str, object]]:
         return [dict(row) for row in rows]
 
 
+def clinic_exists(clinic_id: int) -> bool:
+    with get_db() as db:
+        row = db.execute("SELECT 1 FROM clinics WHERE id = ? LIMIT 1", (clinic_id,)).fetchone()
+    return row is not None
+
+
 def fetch_clinic_settings(clinic_id: int = 1) -> dict[str, str]:
     with get_db() as db:
         row = db.execute(
@@ -756,6 +762,18 @@ def fetch_clinic_settings(clinic_id: int = 1) -> dict[str, str]:
         ,
             (clinic_id,),
         ).fetchone()
+        if row is None and clinic_id != 1:
+            fallback = db.execute(
+                """
+                SELECT id, slug, clinic_name, clinic_timings, clinic_address, brand_tagline, accent_color, logo_text, business_type, avg_booking_value, white_label_enabled, white_label_name, reseller_code, working_days, working_hours, auto_callback_enabled
+                FROM clinics
+                WHERE id = 1
+                """
+            ).fetchone()
+            if fallback is not None:
+                return dict(fallback)
+        if row is None:
+            raise HTTPException(status_code=500, detail="Default clinic configuration is missing.")
         return dict(row)
 
 
@@ -2170,7 +2188,10 @@ def is_authenticated(request: Request) -> bool:
 
 def get_active_clinic_id(request: Request | None = None) -> int:
     if request and request.session.get("dentvoice_clinic_id"):
-        return int(request.session["dentvoice_clinic_id"])
+        clinic_id = int(request.session["dentvoice_clinic_id"])
+        if clinic_exists(clinic_id):
+            return clinic_id
+        request.session["dentvoice_clinic_id"] = 1
     return 1
 
 
